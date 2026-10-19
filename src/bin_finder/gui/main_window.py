@@ -1,19 +1,25 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QButtonGroup,
+    QCheckBox,
+    QComboBox,
     QFrame,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QPushButton,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
-from bin_finder.demo_data import demo_candidates, demo_scenes
+from bin_finder.demo_data import demo_scenes
 from bin_finder.gui.panels import (
+    CandidateCard,
     ExportPanel,
     ProjectPanel,
     ReviewPanel,
@@ -22,8 +28,22 @@ from bin_finder.gui.panels import (
     SelectedPanel,
     SourcePanel,
 )
+from bin_finder.gui.search_worker import SearchWorker
 from bin_finder.gui.theme import APP_STYLE
 from bin_finder.models import CandidateRecord, SceneRecord
+from bin_finder.provider_config import ProviderConfig
+from bin_finder.providers.registry import ProviderRegistry
+from bin_finder.search.service import DiscoveryService, SearchBatchResult, SearchOptions
+
+
+_PROVIDER_LABELS = {
+    "YouTube": "youtube",
+    "Storyblocks": "storyblocks",
+    "Pexels": "pexels",
+    "Pixabay": "pixabay",
+    "Báo điện tử": "news",
+    "Thư viện local": "local",
+}
 
 
 class MainWindow(QMainWindow):
@@ -33,8 +53,18 @@ class MainWindow(QMainWindow):
         self.resize(1640, 980)
         self.setMinimumSize(1500, 820)
         self.setStyleSheet(APP_STYLE)
+
         self.scenes = demo_scenes()
+        self._current_scene = self.scenes[0]
+        self._search_workers: set[SearchWorker] = set()
+
+        project_root = Path(__file__).resolve().parents[3]
+        self.provider_config = ProviderConfig.load(project_root)
+        self.provider_registry = ProviderRegistry.from_config(self.provider_config)
+        self.discovery_service = DiscoveryService(self.provider_registry)
+
         self._build()
+        self._search_scene(self._current_scene)
 
     def _build(self):
         root = QWidget()
@@ -45,10 +75,7 @@ class MainWindow(QMainWindow):
         outer.addWidget(self._header())
         outer.addWidget(self._top_navigation())
 
-        # F001.5 removes user-draggable splitters. The approved workspace keeps
-        # stable proportions while the main window itself may still be resized.
-        # Left workspace: project/scene + search/results. Right workspace:
-        # review + export, widened to make the video preview as useful as possible.
+        # F002 deliberately preserves the accepted F001.5 fixed layout.
         content = QWidget()
         content_layout = QHBoxLayout(content)
         content_layout.setContentsMargins(0, 0, 0, 0)
@@ -84,8 +111,6 @@ class MainWindow(QMainWindow):
         search_column_layout.addWidget(self.source_panel, 30)
         search_column_layout.addWidget(self.search_panel, 70)
 
-        # Stable non-draggable proportions. Search/results keeps enough width for
-        # exactly three result thumbnails per row.
         columns_layout.addWidget(project_scene_column, 34)
         columns_layout.addWidget(search_column, 66)
         left_layout.addWidget(columns, 1)
@@ -105,8 +130,6 @@ class MainWindow(QMainWindow):
         right_layout.addWidget(self.review_panel, 1)
         right_layout.addWidget(self.export_panel, 0)
 
-        # Widen the review column and lock the relationship between the two
-        # workspaces. No splitter handle is exposed to the user.
         content_layout.addWidget(left, 1)
         content_layout.addWidget(right, 0)
         outer.addWidget(content, 1)
@@ -117,7 +140,13 @@ class MainWindow(QMainWindow):
         self.project_panel.output_dir.textChanged.connect(self.export_panel.dest.setText)
         self.project_panel.split_requested.connect(self._prototype_split)
 
-        self._seed_demo_selection()
+        for button in self.search_panel.findChildren(QPushButton):
+            if "Tìm kiếm lại" in button.text():
+                button.clicked.connect(self._search_current_scene)
+        for button in self.source_panel.findChildren(QPushButton):
+            if "Dùng AI tạo nhiều query" in button.text():
+                button.setCheckable(True)
+                button.setChecked(True)
 
     def _header(self):
         header = QFrame()
@@ -168,8 +197,135 @@ class MainWindow(QMainWindow):
         return nav
 
     def _scene_changed(self, scene: SceneRecord):
+        self._current_scene = scene
         self.review_panel.set_scene(scene)
-        self.search_panel.set_scene(scene.scene_id)
+        self._search_scene(scene)
+
+    def _search_current_scene(self):
+        self._search_scene(self._current_scene)
+
+    def _source_options(self) -> SearchOptions:
+        checks = {box.text(): box for box in self.source_panel.findChildren(QCheckBox)}
+        provider_keys = tuple(
+            key
+            for label, key in _PROVIDER_LABELS.items()
+            if label in checks and checks[label].isChecked()
+        )
+
+        combos = self.source_panel.findChildren(QComboBox)
+        duration_text = "Tất cả"
+        resolution_text = "Tất cả (>=720p)"
+        orientation_text = "Tất cả"
+        for combo in combos:
+            if combo.findText("< 4 phút") >= 0:
+                duration_text = combo.currentText()
+            elif combo.findText("1080p+") >= 0:
+                resolution_text = combo.currentText()
+            elif combo.findText("16:9") >= 0:
+                orientation_text = combo.currentText()
+
+        duration_bucket = {
+            "< 4 phút": "short",
+            "4–20 phút": "medium",
+            "> 20 phút": "long",
+        }.get(duration_text, "any")
+        min_height = {"1080p+": 1080, "4K": 2160}.get(resolution_text, 720)
+        orientation = {"16:9": "landscape", "9:16": "portrait", "1:1": "square"}.get(
+            orientation_text, "any"
+        )
+
+        spins = self.source_panel.findChildren(QSpinBox)
+        limit = spins[0].value() if spins else 20
+        creative_commons = bool(
+            checks.get("Creative Commons") and checks["Creative Commons"].isChecked()
+        )
+        multiple_queries = any(
+            button.isCheckable()
+            and button.isChecked()
+            and "Dùng AI tạo nhiều query" in button.text()
+            for button in self.source_panel.findChildren(QPushButton)
+        )
+        return SearchOptions(
+            provider_keys=provider_keys,
+            limit=limit,
+            orientation=orientation,
+            min_height=min_height,
+            duration_bucket=duration_bucket,
+            creative_commons_only=creative_commons,
+            multiple_queries=multiple_queries,
+        )
+
+    def _clear_search_grid(self):
+        while self.search_panel.grid.count():
+            item = self.search_panel.grid.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+    def _set_search_loading(self, scene: SceneRecord):
+        self.search_panel._scene_id = scene.scene_id
+        self._clear_search_grid()
+        self.search_panel.title_label.setText(
+            f"Kết quả tìm kiếm cho cảnh {scene.order:02d} (đang tìm...)"
+        )
+        loading = QLabel("Đang tìm kiếm trên các nguồn đã chọn...")
+        loading.setObjectName("muted")
+        loading.setWordWrap(True)
+        self.search_panel.grid.addWidget(loading, 0, 0, 1, 3)
+        self.search_panel.scroll.verticalScrollBar().setValue(0)
+
+    def _search_scene(self, scene: SceneRecord):
+        self._set_search_loading(scene)
+        worker = SearchWorker(self.discovery_service, scene, self._source_options())
+        self._search_workers.add(worker)
+        worker.result_ready.connect(self._search_complete)
+        worker.failed.connect(self._search_failed)
+        worker.finished.connect(lambda worker=worker: self._release_worker(worker))
+        worker.start()
+
+    def _release_worker(self, worker: SearchWorker):
+        self._search_workers.discard(worker)
+        worker.deleteLater()
+
+    def _search_complete(self, result: SearchBatchResult):
+        if result.scene_id != self._current_scene.scene_id:
+            return
+        self._clear_search_grid()
+        scene = self._current_scene
+        self.search_panel.title_label.setText(
+            f"Kết quả tìm kiếm cho cảnh {scene.order:02d} ({len(result.candidates)} kết quả)"
+        )
+        tooltip_parts = []
+        if result.query_texts:
+            tooltip_parts.append("Query: " + " | ".join(result.query_texts))
+        if result.notices:
+            tooltip_parts.append("Thông báo: " + " | ".join(dict.fromkeys(result.notices)))
+        self.search_panel.setToolTip("\n".join(tooltip_parts))
+
+        if not result.candidates:
+            message = "Không có kết quả."
+            if result.notices:
+                message += "\n" + "\n".join(dict.fromkeys(result.notices))
+            empty = QLabel(message)
+            empty.setObjectName("muted")
+            empty.setWordWrap(True)
+            self.search_panel.grid.addWidget(empty, 0, 0, 1, 3)
+        else:
+            for index, candidate in enumerate(result.candidates):
+                card = CandidateCard(candidate)
+                card.clicked.connect(self.search_panel.candidate_changed.emit)
+                self.search_panel.grid.addWidget(card, index // 3, index % 3)
+
+        self.search_panel.scroll.verticalScrollBar().setValue(0)
+
+    def _search_failed(self, scene_id: str, message: str):
+        if scene_id != self._current_scene.scene_id:
+            return
+        self._clear_search_grid()
+        self.search_panel.title_label.setText("Kết quả tìm kiếm (lỗi)")
+        label = QLabel(message)
+        label.setObjectName("muted")
+        label.setWordWrap(True)
+        self.search_panel.grid.addWidget(label, 0, 0, 1, 3)
 
     def _candidate_selected(self, candidate: CandidateRecord | None):
         if candidate is None:
@@ -177,20 +333,7 @@ class MainWindow(QMainWindow):
         self.scene_panel.mark_selected(candidate.scene_id)
         self.selected_panel.add_or_replace_candidate(candidate)
 
-    def _seed_demo_selection(self):
-        selected_scenes = [scene for scene in self.scenes if scene.status == "selected"]
-        if not selected_scenes:
-            return
-        for index, scene in enumerate(selected_scenes):
-            candidates = demo_candidates(scene.scene_id)
-            if not candidates:
-                continue
-            candidate = candidates[min(index, len(candidates) - 1)]
-            self.selected_panel.add_or_replace_candidate(candidate)
-
     def _prototype_split(self, text: str):
-        # F001 deliberately does not call any AI provider yet. This deterministic
-        # preview keeps the GUI workflow usable while provider contracts are built.
         chunks = [part.strip() for part in text.replace("\n", " ").split(".") if part.strip()]
         if not chunks:
             return
@@ -204,7 +347,8 @@ class MainWindow(QMainWindow):
             for index, chunk in enumerate(chunks, start=1)
         ]
         self.scenes = scenes
+        self._current_scene = scenes[0]
         self.scene_panel.set_scenes(scenes)
         self.selected_panel.reset(total_scenes=len(scenes), scenes=scenes)
-        self.search_panel.set_scene(scenes[0].scene_id)
         self.review_panel.set_scene(scenes[0])
+        self._search_scene(scenes[0])

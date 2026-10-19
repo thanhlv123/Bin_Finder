@@ -42,6 +42,11 @@ class CandidateRecord:
     source_url: str = ""
     proposed_start: float | None = None
     proposed_end: float | None = None
+    thumbnail_url: str = ""
+    preview_url: str = ""
+    creator: str = ""
+    description: str = ""
+    published_at: str = ""
 
 
 @dataclass(frozen=True)
@@ -100,10 +105,7 @@ class FootageProject:
             "scene_count": len(self.scenes),
             "selected_count": len(self.selected_clips),
             "scenes": [
-                {
-                    **asdict(scene),
-                    "context": asdict(scene.context),
-                }
+                {**asdict(scene), "context": asdict(scene.context)}
                 for scene in self.scenes
             ],
             "clips": [asdict(clip) for clip in self.selected_clips],

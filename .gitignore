@@ -7,3 +7,7 @@ cache/
 temp/
 output/
 .DS_Store
+config/providers.local.json
+.env
+.env.*
+!.env.example

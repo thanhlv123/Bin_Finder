@@ -1,0 +1,64 @@
+name: Windows tests
+
+on:
+  push:
+    branches:
+      - main
+      - "bin-finder-f*"
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+
+      - name: Compile
+        shell: pwsh
+        run: python -m compileall -q src run_bin_finder.py
+
+      - name: Unit tests
+        shell: pwsh
+        run: python -m pytest -q
+
+      - name: GUI smoke
+        shell: pwsh
+        run: |
+          @'
+          from PyQt6.QtWidgets import QApplication
+          from bin_finder.gui.main_window import MainWindow
+          app = QApplication([])
+          window = MainWindow()
+          assert window.windowTitle() == "Bin Finder"
+          for _ in range(50):
+              app.processEvents()
+          for worker in list(window._search_workers):
+              worker.wait(3000)
+              app.processEvents()
+          assert window.search_panel._scene_id == "scene_001"
+          window.close()
+          print("GUI_SMOKE_OK")
+          '@ | Set-Content -Encoding UTF8 .github_gui_smoke.py
+          $env:PYTHONPATH = "src"
+          python .github_gui_smoke.py
