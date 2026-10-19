@@ -4,7 +4,7 @@ The accepted F001.5 workspace layout remains fixed unless a real usability bug r
 
 - F001: GUI shell, project/scene models, selected-footage library contract. **PASS**
 - F002: Real discovery providers for YouTube / Storyblocks / Pexels / Pixabay / Local; News deferred. **PASS**
-- F003: Candidate intelligence foundation — content hash, FFprobe metadata, timed transcript sidecars, shot boundaries, reusable analysis cache. **IN PROGRESS**
+- F003: Candidate intelligence foundation — content hash, FFprobe metadata, timed transcript sidecars, shot boundaries, reusable analysis cache. **PASS**
 - F004: Hybrid retrieval — transcript semantic relevance + exact/BM25-style lexical relevance + visual embedding provider contract + score fusion.
 - F005: VLM verification/reranking — subject, action, location, object, time, visual quality, conflict penalties, confidence thresholds.
 - F006: Smart clip extraction — target 5.0s, 3.5–7.0s bounds, shot-aware trim, natural-action preference.
