@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QSpinBox,
     QVBoxLayout,
@@ -30,6 +31,7 @@ from bin_finder.gui.panels import (
 )
 from bin_finder.gui.search_worker import SearchWorker
 from bin_finder.gui.theme import APP_STYLE
+from bin_finder.evaluation import ABComparison, ReviewDecision, ReviewStore
 from bin_finder.models import CandidateRecord, SceneRecord
 from bin_finder.provider_config import ProviderConfig
 from bin_finder.providers.registry import ProviderRegistry
@@ -57,6 +59,7 @@ class MainWindow(QMainWindow):
         self.scenes = demo_scenes()
         self._current_scene = self.scenes[0]
         self._search_workers: set[SearchWorker] = set()
+        self._ab_anchor: CandidateRecord | None = None
 
         project_root = Path(__file__).resolve().parents[3]
         self.provider_config = ProviderConfig.load(project_root)
@@ -137,6 +140,9 @@ class MainWindow(QMainWindow):
         self.scene_panel.scene_changed.connect(self._scene_changed)
         self.search_panel.candidate_changed.connect(self.review_panel.set_candidate)
         self.review_panel.select_candidate.connect(self._candidate_selected)
+        self.review_panel.waitlist_candidate.connect(self._candidate_waitlisted)
+        self.review_panel.reject_candidate.connect(self._candidate_rejected)
+        self.review_panel.compare_candidate.connect(self._candidate_compared)
         self.project_panel.output_dir.textChanged.connect(self.export_panel.dest.setText)
         self.project_panel.split_requested.connect(self._prototype_split)
 
@@ -327,11 +333,83 @@ class MainWindow(QMainWindow):
         label.setWordWrap(True)
         self.search_panel.grid.addWidget(label, 0, 0, 1, 3)
 
+    def _review_store(self) -> ReviewStore:
+        return ReviewStore.for_project(self.project_panel.project_name.text())
+
+    def _record_review(self, candidate: CandidateRecord, decision: str):
+        self._review_store().record_decision(
+            ReviewDecision(
+                scene_id=candidate.scene_id,
+                candidate_id=candidate.candidate_id,
+                decision=decision,
+                provider=candidate.provider,
+                source_id=candidate.source_id,
+                title=candidate.title,
+                score=candidate.score,
+            )
+        )
+
     def _candidate_selected(self, candidate: CandidateRecord | None):
         if candidate is None:
             return
+        self._record_review(candidate, "accepted")
         self.scene_panel.mark_selected(candidate.scene_id)
         self.selected_panel.add_or_replace_candidate(candidate)
+
+    def _candidate_waitlisted(self, candidate: CandidateRecord | None):
+        if candidate is None:
+            return
+        self._record_review(candidate, "waitlist")
+
+    def _candidate_rejected(self, candidate: CandidateRecord | None):
+        if candidate is None:
+            return
+        self._record_review(candidate, "rejected")
+
+    def _candidate_compared(self, candidate: CandidateRecord | None):
+        if candidate is None:
+            return
+        anchor = self._ab_anchor
+        if (
+            anchor is None
+            or anchor.scene_id != candidate.scene_id
+            or anchor.candidate_id == candidate.candidate_id
+        ):
+            self._ab_anchor = candidate
+            self.review_panel.set_comparison_pending(True)
+            return
+
+        box = QMessageBox(self)
+        box.setWindowTitle("So sánh A/B")
+        box.setText(
+            "Chọn footage phù hợp hơn cho cảnh này.\n\n"
+            f"A: {anchor.title}\n"
+            f"B: {candidate.title}"
+        )
+        button_a = box.addButton("Chọn A", QMessageBox.ButtonRole.AcceptRole)
+        button_b = box.addButton("Chọn B", QMessageBox.ButtonRole.AcceptRole)
+        box.addButton("Hủy", QMessageBox.ButtonRole.RejectRole)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked is button_a:
+            winner = anchor
+        elif clicked is button_b:
+            winner = candidate
+        else:
+            winner = None
+
+        if winner is not None:
+            self._review_store().add_comparison(
+                ABComparison(
+                    scene_id=candidate.scene_id,
+                    candidate_a_id=anchor.candidate_id,
+                    candidate_b_id=candidate.candidate_id,
+                    winner_id=winner.candidate_id,
+                )
+            )
+
+        self._ab_anchor = None
+        self.review_panel.set_comparison_pending(False)
 
     def _prototype_split(self, text: str):
         chunks = [part.strip() for part in text.replace("\n", " ").split(".") if part.strip()]
@@ -351,4 +429,6 @@ class MainWindow(QMainWindow):
         self.scene_panel.set_scenes(scenes)
         self.selected_panel.reset(total_scenes=len(scenes), scenes=scenes)
         self.review_panel.set_scene(scenes[0])
+        self._ab_anchor = None
+        self.review_panel.set_comparison_pending(False)
         self._search_scene(scenes[0])

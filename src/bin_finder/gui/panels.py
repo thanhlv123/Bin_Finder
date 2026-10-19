@@ -412,6 +412,9 @@ class SearchResultsPanel(Panel):
 
 class ReviewPanel(Panel):
     select_candidate = pyqtSignal(object)
+    waitlist_candidate = pyqtSignal(object)
+    reject_candidate = pyqtSignal(object)
+    compare_candidate = pyqtSignal(object)
 
     def __init__(self, scene: SceneRecord):
         super().__init__(5, "Xem, phân tích & đánh giá cảnh (Scene 01 / 24)")
@@ -535,12 +538,24 @@ class ReviewPanel(Panel):
         self.body.addWidget(detail)
 
         actions = QHBoxLayout()
-        self.choose = QPushButton("✓ Chọn đoạn này (~5s)")
+        actions.setSpacing(5)
+        self.choose = QPushButton("✓ Chọn (~5s)")
         self.choose.setObjectName("primary")
         self.choose.setEnabled(False)
         self.choose.clicked.connect(lambda: self.select_candidate.emit(self.candidate))
-        actions.addWidget(self.choose)
-        actions.addWidget(QPushButton("＋ Thêm vào danh sách chờ"))
+        self.waitlist = QPushButton("⏳ Chờ")
+        self.waitlist.setEnabled(False)
+        self.waitlist.clicked.connect(lambda: self.waitlist_candidate.emit(self.candidate))
+        self.reject = QPushButton("✕ Loại")
+        self.reject.setEnabled(False)
+        self.reject.clicked.connect(lambda: self.reject_candidate.emit(self.candidate))
+        self.compare = QPushButton("A/B")
+        self.compare.setEnabled(False)
+        self.compare.clicked.connect(lambda: self.compare_candidate.emit(self.candidate))
+        actions.addWidget(self.choose, 2)
+        actions.addWidget(self.waitlist, 1)
+        actions.addWidget(self.reject, 1)
+        actions.addWidget(self.compare, 1)
         self.body.addLayout(actions)
 
     def _tag_label(self, text: str) -> QLabel:
@@ -628,6 +643,10 @@ class ReviewPanel(Panel):
         self.candidate_title.setText("Chưa chọn candidate")
         self.candidate_meta.setText("Nguồn · thời lượng · quyền sử dụng · điểm phù hợp")
         self.choose.setEnabled(False)
+        self.waitlist.setEnabled(False)
+        self.reject.setEnabled(False)
+        self.compare.setEnabled(False)
+        self.compare.setText("A/B")
 
     def set_candidate(self, candidate: CandidateRecord):
         self.candidate = candidate
@@ -638,6 +657,12 @@ class ReviewPanel(Panel):
             f"{candidate.resolution} · Điểm {candidate.score:.2f}"
         )
         self.choose.setEnabled(True)
+        self.waitlist.setEnabled(True)
+        self.reject.setEnabled(True)
+        self.compare.setEnabled(True)
+
+    def set_comparison_pending(self, pending: bool):
+        self.compare.setText("A/B: chọn B" if pending else "A/B")
 
 
 class SelectedPanel(Panel):
@@ -688,6 +713,9 @@ class SelectedPanel(Panel):
 
     def ordered_scene_ids(self) -> list[str]:
         return self._selection.ordered_scene_ids()
+
+    def selected_candidate(self, scene_id: str) -> CandidateRecord | None:
+        return self._selection.get(scene_id)
 
     def _clear_layout(self):
         while self.row.count():
