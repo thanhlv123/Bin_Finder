@@ -346,6 +346,8 @@ class MainWindow(QMainWindow):
                 source_id=candidate.source_id,
                 title=candidate.title,
                 score=candidate.score,
+                source_url=candidate.source_url, creator=candidate.creator,
+                rights_status=candidate.rights_status, source_metadata=candidate.source_metadata,
             )
         )
 

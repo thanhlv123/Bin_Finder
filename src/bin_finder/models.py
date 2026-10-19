@@ -47,6 +47,7 @@ class CandidateRecord:
     creator: str = ""
     description: str = ""
     published_at: str = ""
+    source_metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -65,6 +66,9 @@ class SelectedClipRecord:
     vlm_score: float
     final_score: float
     rights_status: str
+    source_url: str = ""
+    creator: str = ""
+    source_metadata: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

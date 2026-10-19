@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -37,6 +37,10 @@ class ReviewDecision:
     title: str = ""
     score: float = 0.0
     updated_at: str = ""
+    source_url: str = ""
+    creator: str = ""
+    rights_status: str = "unknown"
+    source_metadata: dict[str, Any] = field(default_factory=dict)
 
     def normalized(self) -> "ReviewDecision":
         decision = self.decision.strip().lower()
@@ -51,6 +55,8 @@ class ReviewDecision:
             title=self.title.strip(),
             score=max(0.0, min(1.0, float(self.score))),
             updated_at=self.updated_at or _now_iso(),
+            source_url=self.source_url, creator=self.creator,
+            rights_status=self.rights_status, source_metadata=dict(self.source_metadata),
         )
 
 

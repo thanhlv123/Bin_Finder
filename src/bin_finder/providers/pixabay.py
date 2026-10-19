@@ -5,6 +5,7 @@ from typing import Any
 from bin_finder.models import CandidateRecord
 from bin_finder.providers.base import ProviderSearchResult, ProviderStatus, SearchRequest
 from bin_finder.providers.http import JsonHttpClient
+from bin_finder.providers.normalization import asset_id, number, records, text, url
 
 
 class PixabayProvider:
@@ -44,12 +45,11 @@ class PixabayProvider:
             self.SEARCH_URL,
             params=params,
             provider_name=self.display_name,
+            timeout=15.0,
         )
         candidates: list[CandidateRecord] = []
-        for item in payload.get("hits") or []:
-            if not isinstance(item, dict):
-                continue
-            video_id = str(item.get("id") or "")
+        for item in records(payload, "hits", self.display_name)[:max(0, request.limit)]:
+            video_id = asset_id(item.get("id"))
             if not video_id:
                 continue
             videos = item.get("videos") or {}
@@ -57,12 +57,12 @@ class PixabayProvider:
             if isinstance(videos, dict):
                 for key in ("large", "medium", "small", "tiny"):
                     candidate = videos.get(key)
-                    if isinstance(candidate, dict) and candidate.get("url"):
+                    if isinstance(candidate, dict) and url(candidate.get("url")):
                         rendition = candidate
                         break
-            width = int(rendition.get("width") or 0)
-            height = int(rendition.get("height") or 0)
-            tags = str(item.get("tags") or "").strip()
+            width = int(number(rendition.get("width")))
+            height = int(number(rendition.get("height")))
+            tags = text(item.get("tags")).strip()
             candidates.append(
                 CandidateRecord(
                     candidate_id=f"{request.scene_id}:pixabay:{video_id}",
@@ -70,14 +70,24 @@ class PixabayProvider:
                     provider=self.key,
                     source_id=f"pixabay:{video_id}",
                     title=tags or f"Pixabay video {video_id}",
-                    duration=float(item.get("duration") or 0.0),
+                    duration=number(item.get("duration")),
                     score=0.0,
                     rights_status="pixabay_content_license",
                     resolution=f"{width}x{height}" if width and height else "",
-                    source_url=str(item.get("pageURL") or ""),
-                    thumbnail_url=str(rendition.get("thumbnail") or ""),
-                    preview_url=str(rendition.get("url") or ""),
-                    creator=str(item.get("user") or ""),
+                    source_url=url(item.get("pageURL")),
+                    thumbnail_url=url(rendition.get("thumbnail")),
+                    preview_url=url(rendition.get("url")),
+                    source_metadata={
+                        "asset_id": video_id, "creator_id": asset_id(item.get("user_id")),
+                        "rendition": key if rendition else "",
+                        "renditions": {name: {"url": url(value.get("url")),
+                            "width": int(number(value.get("width"))), "height": int(number(value.get("height"))),
+                            "thumbnail": url(value.get("thumbnail"))}
+                            for name, value in videos.items() if name in {"large", "medium", "small", "tiny"} and isinstance(value, dict)} if isinstance(videos, dict) else {},
+                        "license_basis": "provider-defined", "usage_authorization": "unknown",
+                        "license_url": "https://pixabay.com/service/license-summary/",
+                    },
+                    creator=text(item.get("user")),
                     description=tags,
                 )
             )
