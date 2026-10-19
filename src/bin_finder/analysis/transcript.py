@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 
@@ -61,9 +62,25 @@ def find_transcript_sidecar(media_path: str | Path) -> Path | None:
     return next((item for item in matches if item.is_file()), None)
 
 
-def load_transcript_sidecar(media_path: str | Path) -> tuple[Path | None, tuple[TranscriptSegment, ...]]:
+def transcript_sha256(path: Path | None) -> str:
+    if path is None:
+        return ""
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        while True:
+            chunk = handle.read(256 * 1024)
+            if not chunk:
+                break
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def load_transcript_sidecar(
+    media_path: str | Path,
+) -> tuple[Path | None, str, tuple[TranscriptSegment, ...]]:
     sidecar = find_transcript_sidecar(media_path)
     if sidecar is None:
-        return None, ()
+        return None, "", ()
+    digest = transcript_sha256(sidecar)
     text = sidecar.read_text(encoding="utf-8-sig", errors="replace")
-    return sidecar, parse_timed_transcript(text)
+    return sidecar, digest, parse_timed_transcript(text)
