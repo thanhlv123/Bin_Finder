@@ -7,7 +7,8 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 - **F001.5 GUI workspace:** PASS
 - **F002 provider discovery:** PASS
 - **F003 candidate intelligence:** PASS
-- **Next:** F004 hybrid retrieval
+- **F004 hybrid retrieval:** PASS
+- **Next:** F005 VLM verification/reranking
 
 The accepted GUI layout remains fixed. New retrieval capabilities are added behind the existing panels rather than redesigning the workspace.
 
@@ -28,7 +29,8 @@ Script scene
   -> local + enabled provider discovery
   -> normalized candidate records
   -> candidate analysis
-  -> hybrid semantic retrieval + VLM verification
+  -> shot-level hybrid retrieval
+  -> VLM verification
   -> selected-footage filmstrip
   -> clean export library + manifests
 ```
@@ -42,6 +44,19 @@ F003 adds a backend-only analysis layer for local or otherwise authorized media:
 - SRT/VTT timestamped transcript sidecars
 - FFmpeg scene-change shot boundaries
 - SQLite analysis cache keyed by media + transcript identity + analyzer version
+
+## Hybrid retrieval
+
+F004 ranks exact shot/time ranges using:
+
+- BM25 relevance
+- exact scene-context phrase matches
+- pluggable text similarity
+- pluggable visual similarity
+- normalized weighted fusion
+- a retrieval evaluation harness reporting Top-1 accuracy, Recall@K, and MRR
+
+The default text scorer is dependency-free. The visual scorer is a provider contract until a visual embedding runtime is approved.
 
 No generic remote downloader is included.
 
