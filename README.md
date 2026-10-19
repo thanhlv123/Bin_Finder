@@ -6,7 +6,8 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 
 - **F001.5 GUI workspace:** PASS
 - **F002 provider discovery:** PASS
-- **F003 candidate intelligence:** in development on its milestone branch
+- **F003 candidate intelligence:** PASS
+- **Next:** F004 hybrid retrieval
 
 The accepted GUI layout remains fixed. New retrieval capabilities are added behind the existing panels rather than redesigning the workspace.
 
@@ -27,7 +28,7 @@ Script scene
   -> local + enabled provider discovery
   -> normalized candidate records
   -> candidate analysis
-  -> later: hybrid semantic retrieval + VLM verification
+  -> hybrid semantic retrieval + VLM verification
   -> selected-footage filmstrip
   -> clean export library + manifests
 ```
