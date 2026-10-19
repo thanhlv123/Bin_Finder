@@ -10,7 +10,8 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 - **F004 hybrid retrieval:** PASS
 - **F005 context verification / VLM reranking contract:** PASS
 - **F006 smart clip planning/extraction:** PASS
-- **Next:** F007 local footage intelligence
+- **F007 local footage intelligence:** PASS
+- **Next:** F008 source diversity
 
 The accepted GUI layout remains fixed. New retrieval capabilities are added behind the existing panels rather than redesigning the workspace.
 
@@ -28,12 +29,14 @@ The accepted GUI layout remains fixed. New retrieval capabilities are added behi
 ```text
 Script scene
   -> scene context / queries
-  -> local + enabled provider discovery
+  -> local-first indexed discovery
+  -> external providers only when local is insufficient
   -> normalized candidate records
   -> candidate analysis
   -> shot-level hybrid retrieval
   -> top-N context/VLM verification
   -> smart 3.5–7.0 second clip proposal
+  -> source diversity / anti-overlap
   -> selected-footage filmstrip
   -> clean export library + manifests
 ```
@@ -55,6 +58,12 @@ The current default verifier is a dependency-free transcript/metadata heuristic.
 ## Smart clips
 
 F006 keeps complete shots when they already fit the 3.5–7.0 second duration policy. Longer shots receive a 5-second window around an optional evidence anchor; shorter shots are rejected by default rather than crossing a visual cut. A safe FFmpeg backend can extract approved local/authorized ranges without overwriting existing output by default.
+
+## Local footage intelligence
+
+F007 adds an incremental SQLite index for the configured local library. Unchanged files are not re-hashed, transcript sidecar changes refresh without re-hashing video bytes, and renamed files retain the same content-based source ID. When a strong local match reaches the default threshold, network providers can be skipped for that scene.
+
+F007 also exposes local search-by-image using a cached perceptual frame-hash baseline. It is intended for near-duplicate/appearance matching, not semantic CLIP search.
 
 No generic remote downloader is included.
 
