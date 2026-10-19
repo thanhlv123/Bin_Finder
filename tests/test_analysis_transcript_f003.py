@@ -37,7 +37,7 @@ Airport family goodbye
     assert transcript[0].end == 2.0
 
 
-def test_exact_sidecar_is_preferred(tmp_path: Path):
+def test_exact_sidecar_is_preferred_and_fingerprinted(tmp_path: Path):
     media = tmp_path / "clip.mp4"
     media.write_bytes(b"video")
     language_sidecar = tmp_path / "clip.en.srt"
@@ -52,6 +52,7 @@ def test_exact_sidecar_is_preferred(tmp_path: Path):
     )
 
     assert find_transcript_sidecar(media) == exact
-    path, transcript = load_transcript_sidecar(media)
+    path, digest, transcript = load_transcript_sidecar(media)
     assert path == exact
+    assert len(digest) == 64
     assert transcript[0].text == "Exact"
