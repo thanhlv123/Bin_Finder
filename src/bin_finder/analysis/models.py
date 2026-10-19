@@ -57,12 +57,14 @@ class CandidateAnalysis:
     transcript: tuple[TranscriptSegment, ...] = ()
     shots: tuple[ShotSegment, ...] = ()
     transcript_source: str = ""
+    transcript_sha256: str = ""
     detector_backend: str = ""
     warnings: tuple[str, ...] = ()
 
     @property
     def cache_key(self) -> str:
-        return f"{self.fingerprint.sha256}:{self.analyzer_version}"
+        transcript_identity = self.transcript_sha256 or "none"
+        return f"{self.fingerprint.sha256}:{transcript_identity}:{self.analyzer_version}"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -73,6 +75,7 @@ class CandidateAnalysis:
             "transcript": [asdict(item) for item in self.transcript],
             "shots": [asdict(item) for item in self.shots],
             "transcript_source": self.transcript_source,
+            "transcript_sha256": self.transcript_sha256,
             "detector_backend": self.detector_backend,
             "warnings": list(self.warnings),
         }
@@ -89,6 +92,7 @@ class CandidateAnalysis:
             ),
             shots=tuple(ShotSegment(**item) for item in payload.get("shots", [])),
             transcript_source=str(payload.get("transcript_source") or ""),
+            transcript_sha256=str(payload.get("transcript_sha256") or ""),
             detector_backend=str(payload.get("detector_backend") or ""),
             warnings=tuple(str(item) for item in payload.get("warnings", [])),
         )
