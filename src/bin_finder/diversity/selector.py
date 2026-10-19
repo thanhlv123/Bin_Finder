@@ -119,17 +119,26 @@ class SourceDiversitySelector:
     def select(
         self,
         candidates: Iterable[DiversityCandidate],
+        *,
+        expected_scenes: Iterable[tuple[int, str]] | None = None,
     ) -> DiversitySelectionResult:
         grouped: dict[tuple[int, str], list[DiversityCandidate]] = defaultdict(list)
         for candidate in candidates:
             grouped[(candidate.scene_order, candidate.scene_id)].append(candidate)
 
+        scene_keys = set(grouped)
+        if expected_scenes is not None:
+            scene_keys.update(
+                (int(scene_order), str(scene_id))
+                for scene_order, scene_id in expected_scenes
+            )
+
         selected: list[DiversityCandidate] = []
         decisions: list[SelectionDecision] = []
 
-        for (scene_order, scene_id) in sorted(grouped):
+        for scene_order, scene_id in sorted(scene_keys):
             scene_candidates = suppress_scene_duplicates(
-                grouped[(scene_order, scene_id)],
+                grouped.get((scene_order, scene_id), ()),
                 iou_threshold=self.policy.duplicate_iou_threshold,
             )
             if not scene_candidates:
