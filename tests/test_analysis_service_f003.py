@@ -38,10 +38,11 @@ class FakeDetector:
         )
 
 
-def test_analysis_service_reuses_content_cache_after_rename(tmp_path: Path):
+def test_analysis_service_reuses_content_cache_after_media_and_sidecar_rename(tmp_path: Path):
     media = tmp_path / "clip.mp4"
+    sidecar = tmp_path / "clip.srt"
     media.write_bytes(b"authorized local media")
-    (tmp_path / "clip.srt").write_text(
+    sidecar.write_text(
         "1\n00:00:01,000 --> 00:00:02,000\nHavana mechanic\n",
         encoding="utf-8",
     )
@@ -56,15 +57,49 @@ def test_analysis_service_reuses_content_cache_after_rename(tmp_path: Path):
 
     first = service.analyze_path(media)
     renamed = tmp_path / "renamed.mp4"
+    renamed_sidecar = tmp_path / "renamed.srt"
     media.rename(renamed)
+    sidecar.rename(renamed_sidecar)
     second = service.analyze_path(renamed)
 
     assert probe.calls == 1
     assert detector.calls == 1
     assert first.fingerprint.sha256 == second.fingerprint.sha256
+    assert first.transcript_sha256 == second.transcript_sha256
     assert second.source_path.endswith("renamed.mp4")
+    assert second.transcript_source.endswith("renamed.srt")
     assert first.transcript[0].text == "Havana mechanic"
     assert len(first.shots) == 2
+
+
+def test_transcript_change_invalidates_cached_analysis(tmp_path: Path):
+    media = tmp_path / "clip.mp4"
+    sidecar = tmp_path / "clip.srt"
+    media.write_bytes(b"authorized local media")
+    sidecar.write_text(
+        "1\n00:00:01,000 --> 00:00:02,000\nFirst transcript\n",
+        encoding="utf-8",
+    )
+    probe = FakeProbe()
+    detector = FakeDetector()
+    service = CandidateAnalysisService(
+        cache=AnalysisCache(tmp_path / "cache.sqlite3"),
+        probe=probe,
+        detector=detector,
+        analyzer_version="f003-test",
+    )
+
+    first = service.analyze_path(media)
+    sidecar.write_text(
+        "1\n00:00:01,000 --> 00:00:02,000\nChanged transcript\n",
+        encoding="utf-8",
+    )
+    second = service.analyze_path(media)
+
+    assert first.transcript_sha256 != second.transcript_sha256
+    assert second.transcript[0].text == "Changed transcript"
+    assert probe.calls == 2
+    assert detector.calls == 2
 
 
 def test_analyze_candidate_only_accepts_local_media(tmp_path: Path):
