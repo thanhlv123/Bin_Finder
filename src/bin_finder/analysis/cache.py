@@ -29,6 +29,7 @@ class AnalysisCache:
             CREATE TABLE IF NOT EXISTS analysis_cache (
                 cache_key TEXT PRIMARY KEY,
                 sha256 TEXT NOT NULL,
+                transcript_sha256 TEXT NOT NULL,
                 analyzer_version TEXT NOT NULL,
                 payload_json TEXT NOT NULL,
                 created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -36,13 +37,19 @@ class AnalysisCache:
             """
         )
         connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_analysis_sha_version "
-            "ON analysis_cache(sha256, analyzer_version)"
+            "CREATE INDEX IF NOT EXISTS idx_analysis_identity "
+            "ON analysis_cache(sha256, transcript_sha256, analyzer_version)"
         )
         return connection
 
-    def get(self, sha256: str, analyzer_version: str) -> CandidateAnalysis | None:
-        cache_key = f"{sha256}:{analyzer_version}"
+    def get(
+        self,
+        sha256: str,
+        transcript_sha256: str,
+        analyzer_version: str,
+    ) -> CandidateAnalysis | None:
+        transcript_identity = transcript_sha256 or "none"
+        cache_key = f"{sha256}:{transcript_identity}:{analyzer_version}"
         with self._connect() as connection:
             row = connection.execute(
                 "SELECT payload_json FROM analysis_cache WHERE cache_key = ?",
@@ -67,8 +74,14 @@ class AnalysisCache:
         with self._connect() as connection:
             connection.execute(
                 """
-                INSERT INTO analysis_cache(cache_key, sha256, analyzer_version, payload_json)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO analysis_cache(
+                    cache_key,
+                    sha256,
+                    transcript_sha256,
+                    analyzer_version,
+                    payload_json
+                )
+                VALUES (?, ?, ?, ?, ?)
                 ON CONFLICT(cache_key) DO UPDATE SET
                     payload_json = excluded.payload_json,
                     created_at = CURRENT_TIMESTAMP
@@ -76,6 +89,7 @@ class AnalysisCache:
                 (
                     analysis.cache_key,
                     analysis.fingerprint.sha256,
+                    analysis.transcript_sha256 or "",
                     analysis.analyzer_version,
                     payload,
                 ),
