@@ -11,7 +11,7 @@ The accepted F001.5 workspace layout remains fixed unless a real usability bug r
 - F007: Local footage intelligence — incremental indexing, local-first search, content-hash reuse, transcript-aware refresh, perceptual search-by-image baseline. **PASS**
 - F008: Source diversity — source cooldown, anti-adjacent reuse, anti-overlap, duplicate suppression, quality guardrails, unresolved flags. **PASS**
 - F009: Human review — persistent accept/reject/waitlist decisions, A/B comparisons, evaluation summaries, compact review controls. **PASS**
-- F010: Real 1–3 minute script acceptance, tuning, and stable manifest adapter for AI_Video_Editor.
+- F010: Real 1–3 minute script acceptance, unresolved-scene gating, quality metrics, and stable AI_Video_Editor manifest adapter. **PASS**
 
 ## Architecture principles learned from public footage-search projects
 
