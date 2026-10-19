@@ -13,7 +13,7 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 - **F007 local footage intelligence:** PASS
 - **F008 source diversity:** PASS
 - **F009 human review / A-B evaluation:** PASS
-- **Next:** F010 real-script acceptance and AI_Video_Editor adapter
+- **F010 acceptance gate / AI_Video_Editor adapter:** PASS
 
 The accepted GUI layout remains fixed. New retrieval capabilities are added behind the existing panels rather than redesigning the workspace.
 
@@ -112,5 +112,9 @@ Python 3.12 + PyQt6. Run:
 ```powershell
 & ".\start_bin_finder.cmd"
 ```
+
+## Acceptance and integration contract
+
+F010 adds a strict 1–3 minute acceptance gate, per-scene readiness reporting, score/coverage metrics, rotation/overlap validation, and a versioned `ai_video_editor_bin_finder_adapter_v1` manifest. Bin Finder still does not modify AI_Video_Editor; the adapter is the stable handoff contract for the later integration step after Windows acceptance.
 
 See `docs/ROADMAP.md` for the milestone plan.
