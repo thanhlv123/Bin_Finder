@@ -48,6 +48,7 @@ class CandidateRecord:
     description: str = ""
     published_at: str = ""
     source_metadata: dict[str, Any] = field(default_factory=dict)
+    acquisition_manifest: str = ""
 
 
 @dataclass(frozen=True)
