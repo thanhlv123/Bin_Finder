@@ -13,7 +13,11 @@ from bin_finder.analysis.models import (
 )
 from bin_finder.analysis.probe import FFprobeMediaProbe, MediaProbeError
 from bin_finder.analysis.scene_detection import FfmpegSceneDetector, ShotDetectionResult
-from bin_finder.analysis.transcript import load_transcript_sidecar
+from bin_finder.analysis.transcript import (
+    find_transcript_sidecar,
+    load_transcript_sidecar,
+    transcript_sha256,
+)
 from bin_finder.models import CandidateRecord
 
 
@@ -44,10 +48,21 @@ class CandidateAnalysisService:
             raise FileNotFoundError(str(media_path))
 
         fingerprint = fingerprint_file(media_path)
+        sidecar = find_transcript_sidecar(media_path)
+        sidecar_sha256 = transcript_sha256(sidecar)
         if not force:
-            cached = self.cache.get(fingerprint.sha256, self.analyzer_version)
+            cached = self.cache.get(
+                fingerprint.sha256,
+                sidecar_sha256,
+                self.analyzer_version,
+            )
             if cached is not None:
-                return replace(cached, source_path=str(media_path), fingerprint=fingerprint)
+                return replace(
+                    cached,
+                    source_path=str(media_path),
+                    fingerprint=fingerprint,
+                    transcript_source=str(sidecar) if sidecar else "",
+                )
 
         warnings: list[str] = []
         try:
@@ -56,7 +71,7 @@ class CandidateAnalysisService:
             metadata = MediaMetadata()
             warnings.append(str(exc))
 
-        transcript_source, transcript = load_transcript_sidecar(media_path)
+        transcript_source, loaded_sha256, transcript = load_transcript_sidecar(media_path)
         if transcript_source is None:
             warnings.append("Không tìm thấy transcript sidecar SRT/VTT.")
 
@@ -72,6 +87,7 @@ class CandidateAnalysisService:
             transcript=transcript,
             shots=detection.shots,
             transcript_source=str(transcript_source) if transcript_source else "",
+            transcript_sha256=loaded_sha256,
             detector_backend=detection.backend,
             warnings=tuple(dict.fromkeys(warnings)),
         )
