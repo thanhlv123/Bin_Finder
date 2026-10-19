@@ -54,6 +54,9 @@ def build_ai_video_editor_manifest(
                         "vlm_score": clip.vlm_score,
                         "final_score": clip.final_score,
                         "rights_status": clip.rights_status,
+                        "source_url": clip.source_url,
+                        "creator": clip.creator,
+                        "source_metadata": clip.source_metadata,
                     }
                 ),
             }

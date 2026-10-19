@@ -2,18 +2,18 @@ from __future__ import annotations
 
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 
 @dataclass(frozen=True)
 class ProviderConfig:
-    youtube_api_key: str = ""
-    pexels_api_key: str = ""
-    pixabay_api_key: str = ""
-    storyblocks_public_key: str = ""
-    storyblocks_secret_key: str = ""
+    youtube_api_key: str = field(default="", repr=False)
+    pexels_api_key: str = field(default="", repr=False)
+    pixabay_api_key: str = field(default="", repr=False)
+    storyblocks_public_key: str = field(default="", repr=False)
+    storyblocks_secret_key: str = field(default="", repr=False)
     storyblocks_project_id: str = ""
     storyblocks_user_id: str = ""
     local_library_path: str = ""

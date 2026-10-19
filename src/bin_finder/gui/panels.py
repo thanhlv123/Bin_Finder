@@ -313,6 +313,7 @@ class CandidateCard(QFrame):
     def __init__(self, candidate: CandidateRecord):
         super().__init__()
         self.candidate = candidate
+        self.setToolTip(f"{candidate.creator}\n{candidate.source_url}")
         self.setMinimumWidth(0)
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         self.setStyleSheet("QFrame {background:#0b1a29; border:1px solid #1d3b55; border-radius:8px;} QFrame:hover{border-color:#23a4ff;}")
@@ -650,6 +651,7 @@ class ReviewPanel(Panel):
 
     def set_candidate(self, candidate: CandidateRecord):
         self.candidate = candidate
+        self.setToolTip(f"{candidate.creator}\n{candidate.source_url}")
         self.video.set_preview_pixmap(make_thumb(candidate.title, 1280, 720))
         self.candidate_title.setText(candidate.title)
         self.candidate_meta.setText(

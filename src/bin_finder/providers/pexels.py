@@ -5,6 +5,7 @@ from typing import Any
 from bin_finder.models import CandidateRecord
 from bin_finder.providers.base import ProviderSearchResult, ProviderStatus, SearchRequest
 from bin_finder.providers.http import JsonHttpClient
+from bin_finder.providers.normalization import asset_id, number, records, text, url
 
 
 class PexelsProvider:
@@ -46,22 +47,24 @@ class PexelsProvider:
             params=params,
             headers={"Authorization": self.api_key},
             provider_name=self.display_name,
+            timeout=15.0,
         )
         candidates: list[CandidateRecord] = []
-        for item in payload.get("videos") or []:
-            if not isinstance(item, dict):
-                continue
-            video_id = str(item.get("id") or "")
+        for item in records(payload, "videos", self.display_name)[:max(0, request.limit)]:
+            video_id = asset_id(item.get("id"))
             if not video_id:
                 continue
-            user = item.get("user") or {}
-            files = [entry for entry in (item.get("video_files") or []) if isinstance(entry, dict)]
-            files.sort(key=lambda entry: int(entry.get("width") or 0) * int(entry.get("height") or 0), reverse=True)
+            user = item.get("user") if isinstance(item.get("user"), dict) else {}
+            raw_files = item.get("video_files")
+            files = [entry for entry in raw_files if isinstance(entry, dict) and url(entry.get("link"))
+                     and text(entry.get("file_type")) in {"", "video/mp4"}] if isinstance(raw_files, list) else []
+            files.sort(key=lambda entry: (-number(entry.get("width")) * number(entry.get("height")),
+                                          url(entry.get("link")), str(entry.get("id", ""))))
             best = files[0] if files else {}
-            width = int(best.get("width") or 0)
-            height = int(best.get("height") or 0)
+            width = int(number(best.get("width")) or number(item.get("width")))
+            height = int(number(best.get("height")) or number(item.get("height")))
             resolution = f"{width}x{height}" if width and height else ""
-            title = str(item.get("url") or f"Pexels video {video_id}").rstrip("/").split("/")[-1].replace("-", " ")
+            title = (url(item.get("url")) or f"Pexels video {video_id}").rstrip("/").split("/")[-1].replace("-", " ")
             candidates.append(
                 CandidateRecord(
                     candidate_id=f"{request.scene_id}:pexels:{video_id}",
@@ -69,14 +72,22 @@ class PexelsProvider:
                     provider=self.key,
                     source_id=f"pexels:{video_id}",
                     title=title or f"Pexels video {video_id}",
-                    duration=float(item.get("duration") or 0.0),
+                    duration=number(item.get("duration")),
                     score=0.0,
                     rights_status="pexels_license",
                     resolution=resolution,
-                    source_url=str(item.get("url") or ""),
-                    thumbnail_url=str(item.get("image") or ""),
-                    preview_url=str(best.get("link") or ""),
-                    creator=str(user.get("name") or ""),
+                    source_url=url(item.get("url")),
+                    thumbnail_url=url(item.get("image")),
+                    preview_url=url(best.get("link")),
+                    source_metadata={
+                        "asset_id": video_id, "creator_id": asset_id(user.get("id")),
+                        "creator_url": url(user.get("url")),
+                        "renditions": [{"id": asset_id(f.get("id")), "url": url(f.get("link")),
+                                        "width": int(number(f.get("width"))), "height": int(number(f.get("height")))} for f in files],
+                        "license_basis": "provider-defined", "usage_authorization": "unknown",
+                        "license_url": "https://www.pexels.com/license/",
+                    },
+                    creator=text(user.get("name")),
                 )
             )
         return ProviderSearchResult(self.key, candidates)
