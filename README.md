@@ -11,7 +11,8 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 - **F005 context verification / VLM reranking contract:** PASS
 - **F006 smart clip planning/extraction:** PASS
 - **F007 local footage intelligence:** PASS
-- **Next:** F008 source diversity
+- **F008 source diversity:** PASS
+- **Next:** F009 preview / accept / reject / A-B evaluation
 
 The accepted GUI layout remains fixed. New retrieval capabilities are added behind the existing panels rather than redesigning the workspace.
 
@@ -37,6 +38,7 @@ Script scene
   -> top-N context/VLM verification
   -> smart 3.5–7.0 second clip proposal
   -> source diversity / anti-overlap
+  -> human review / evaluation
   -> selected-footage filmstrip
   -> clean export library + manifests
 ```
@@ -64,6 +66,10 @@ F006 keeps complete shots when they already fit the 3.5–7.0 second duration po
 F007 adds an incremental SQLite index for the configured local library. Unchanged files are not re-hashed, transcript sidecar changes refresh without re-hashing video bytes, and renamed files retain the same content-based source ID. When a strong local match reaches the default threshold, network providers can be skipped for that scene.
 
 F007 also exposes local search-by-image using a cached perceptual frame-hash baseline. It is intended for near-duplicate/appearance matching, not semantic CLIP search.
+
+## Source diversity
+
+F008 enforces the final source-rotation rules. The same source cannot be adjacent by default, overlapping time ranges from the same source are rejected, duplicate groups can suppress repeated visuals, and near-identical same-source ranges are collapsed. A lower-ranked alternative is used only when it stays within the configured quality-drop guardrail; otherwise the scene remains unresolved instead of forcing poor footage.
 
 No generic remote downloader is included.
 
