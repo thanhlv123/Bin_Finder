@@ -4,15 +4,10 @@ from bin_finder.demo_data import demo_candidates, demo_scenes
 from bin_finder.gui.panels import ReviewPanel
 
 
-def app():
-    instance = QApplication.instance()
-    if instance is None:
-        instance = QApplication([])
-    return instance
+APP = QApplication.instance() or QApplication([])
 
 
 def test_review_panel_has_compact_decision_controls():
-    app()
     panel = ReviewPanel(demo_scenes()[0])
     assert panel.choose.text() == "✓ Chọn (~5s)"
     assert panel.waitlist.text() == "⏳ Chờ"
@@ -29,10 +24,12 @@ def test_review_panel_has_compact_decision_controls():
     assert panel.waitlist.isEnabled() is True
     assert panel.reject.isEnabled() is True
     assert panel.compare.isEnabled() is True
+    panel.close()
+    panel.deleteLater()
+    APP.processEvents()
 
 
 def test_review_panel_ab_pending_label_does_not_change_geometry():
-    app()
     panel = ReviewPanel(demo_scenes()[0])
     before = panel.video.height()
     panel.set_comparison_pending(True)
@@ -40,3 +37,6 @@ def test_review_panel_ab_pending_label_does_not_change_geometry():
     assert panel.video.height() == before == 280
     panel.set_comparison_pending(False)
     assert panel.compare.text() == "A/B"
+    panel.close()
+    panel.deleteLater()
+    APP.processEvents()
