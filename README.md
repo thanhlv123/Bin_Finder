@@ -1,11 +1,53 @@
-# Bin Finder — F001.5 Fixed Workspace
+# Bin Finder
 
-F001.5 finalizes the Windows-local GUI shell before live providers are connected.
-No live downloader or provider is enabled yet.
+Bin Finder is a Windows-local desktop application for discovering, analyzing, reviewing, selecting, and exporting script-matched footage.
 
-## Workflow numbering
+## Current milestone status
 
-The panels are renumbered by workflow rather than by screen position:
+- **F001.5 GUI workspace:** PASS
+- **F002 provider discovery:** PASS
+- **F003 candidate intelligence:** PASS
+- **Next:** F004 hybrid retrieval
+
+The accepted GUI layout remains fixed. New retrieval capabilities are added behind the existing panels rather than redesigning the workspace.
+
+## Current discovery sources
+
+- YouTube Data API v3 — discovery/metadata only
+- Storyblocks API v2
+- Pexels Video API
+- Pixabay Video API
+- Local footage library
+- News/electronic newspapers — visible in the GUI but backend intentionally deferred
+
+## Workflow
+
+```text
+Script scene
+  -> scene context / queries
+  -> local + enabled provider discovery
+  -> normalized candidate records
+  -> candidate analysis
+  -> hybrid semantic retrieval + VLM verification
+  -> selected-footage filmstrip
+  -> clean export library + manifests
+```
+
+## Candidate intelligence
+
+F003 adds a backend-only analysis layer for local or otherwise authorized media:
+
+- SHA-256 content identity
+- FFprobe metadata
+- SRT/VTT timestamped transcript sidecars
+- FFmpeg scene-change shot boundaries
+- SQLite analysis cache keyed by media + transcript identity + analyzer version
+
+No generic remote downloader is included.
+
+## Stable GUI rules
+
+The seven workflow panels stay in the accepted F001.5 layout:
 
 1. Dự án & Kịch bản
 2. Danh sách cảnh trong kịch bản
@@ -15,46 +57,27 @@ The panels are renumbered by workflow rather than by screen position:
 6. Danh sách cảnh đã chọn
 7. Xuất footage
 
-## F001.5 layout changes
+The search-results grid remains exactly three cards per row. Review/export geometry remains fixed.
 
-- Removed user-draggable splitters from the main workspace.
-- The project/scene column is fixed at 330 px.
-- The review column is fixed at 650 px so the preview remains wide and stable.
-- The source/filter panel has a fixed 250 px height; search results use the remaining center space.
-- Search results remain exactly three candidate cards per row.
-- The preview now preserves the complete image aspect ratio and never crops the frame.
-- Panel 7 export controls are compact: the destination field is shorter and export options use shorter visible labels with full tooltips.
-- Selecting a candidate cannot resize the review/export workspace.
-- Top navigation renders literal ampersands correctly.
-
-## Existing F001 workflow
-
-- Clicking a script scene refreshes scene-specific candidate results.
-- Clicking a candidate previews it in panel 5.
-- Choosing the candidate marks its scene selected and updates panel 6.
-- Panel 6 keeps exactly one current candidate per scene, sorted by script order, with horizontal scrolling.
-- Reselecting a scene replaces its current footage instead of appending a duplicate.
-
-## Sources reserved for F002
-
-YouTube, Storyblocks, Pexels, Pixabay, News/electronic newspapers, and Local library.
-
-## Stable rules
+## Stable selection rules
 
 - `scene_id` stays stable when footage is replaced.
 - `clip_id` identifies one concrete selected clip.
 - Adjacent scenes may not reuse the same source video.
 - The same source may return after at least one different source.
 - Overlapping ranges from the same source are invalid.
-- Final output remains one clean selected-footage folder plus manifest/index files.
+- Final output is a clean folder containing approved clips plus machine-readable manifests.
 
-## Windows update
+## Provider secrets
 
-Extract this package directly over the existing project directory and keep the existing `.venv`.
-No new runtime dependency was added.
+Provider credentials are loaded from environment variables or the gitignored `config/providers.local.json`. Secrets must never be committed, printed, or written into candidate/manifest data.
 
-Run: `start_bin_finder.cmd`
+## Windows
 
-## Next milestone
+Python 3.12 + PyQt6. Run:
 
-F002: provider architecture and real discovery integration.
+```powershell
+& ".\start_bin_finder.cmd"
+```
+
+See `docs/ROADMAP.md` for the milestone plan.
