@@ -9,7 +9,8 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 - **F003 candidate intelligence:** PASS
 - **F004 hybrid retrieval:** PASS
 - **F005 context verification / VLM reranking contract:** PASS
-- **Next:** F006 smart clip extraction
+- **F006 smart clip planning/extraction:** PASS
+- **Next:** F007 local footage intelligence
 
 The accepted GUI layout remains fixed. New retrieval capabilities are added behind the existing panels rather than redesigning the workspace.
 
@@ -32,7 +33,7 @@ Script scene
   -> candidate analysis
   -> shot-level hybrid retrieval
   -> top-N context/VLM verification
-  -> smart clip proposal
+  -> smart 3.5–7.0 second clip proposal
   -> selected-footage filmstrip
   -> clean export library + manifests
 ```
@@ -50,6 +51,10 @@ F004 ranks exact shot/time ranges using BM25, exact scene-context phrases, plugg
 F005 adds a top-N verification contract with separate scores for subject, action, location, objects, time, visual quality, and context conflict. Provider failures fall back safely to F004 order.
 
 The current default verifier is a dependency-free transcript/metadata heuristic. A future local or cloud VLM can implement the same interface without changing the retrieval engine or GUI.
+
+## Smart clips
+
+F006 keeps complete shots when they already fit the 3.5–7.0 second duration policy. Longer shots receive a 5-second window around an optional evidence anchor; shorter shots are rejected by default rather than crossing a visual cut. A safe FFmpeg backend can extract approved local/authorized ranges without overwriting existing output by default.
 
 No generic remote downloader is included.
 
