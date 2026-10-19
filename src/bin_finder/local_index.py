@@ -82,8 +82,8 @@ class LocalMediaIndex:
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS media (
-                content_sha256 TEXT PRIMARY KEY,
-                path TEXT NOT NULL UNIQUE,
+                path TEXT PRIMARY KEY,
+                content_sha256 TEXT NOT NULL,
                 size_bytes INTEGER NOT NULL,
                 mtime_ns INTEGER NOT NULL,
                 title TEXT NOT NULL,
@@ -112,7 +112,7 @@ class LocalMediaIndex:
                     f"ALTER TABLE media ADD COLUMN {column} {definition}"
                 )
         connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_media_path ON media(path)"
+            "CREATE INDEX IF NOT EXISTS idx_media_sha ON media(content_sha256)"
         )
         connection.commit()
         return connection
@@ -205,7 +205,8 @@ class LocalMediaIndex:
                     """
                     SELECT visual_hash
                     FROM media
-                    WHERE content_sha256 = ?
+                    WHERE content_sha256 = ? AND visual_hash <> ''
+                    LIMIT 1
                     """,
                     (content_sha256,),
                 ).fetchone()
@@ -217,22 +218,15 @@ class LocalMediaIndex:
 
                 connection.execute(
                     """
-                    DELETE FROM media
-                    WHERE path = ? AND content_sha256 <> ?
-                    """,
-                    (resolved, content_sha256),
-                )
-                connection.execute(
-                    """
                     INSERT INTO media(
-                        content_sha256, path, size_bytes, mtime_ns,
+                        path, content_sha256, size_bytes, mtime_ns,
                         title, parent_text, transcript_text,
                         transcript_path, transcript_size, transcript_mtime_ns,
                         visual_hash
                     )
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(content_sha256) DO UPDATE SET
-                        path = excluded.path,
+                    ON CONFLICT(path) DO UPDATE SET
+                        content_sha256 = excluded.content_sha256,
                         size_bytes = excluded.size_bytes,
                         mtime_ns = excluded.mtime_ns,
                         title = excluded.title,
@@ -242,15 +236,16 @@ class LocalMediaIndex:
                         transcript_size = excluded.transcript_size,
                         transcript_mtime_ns = excluded.transcript_mtime_ns,
                         visual_hash = CASE
-                            WHEN media.visual_hash <> ''
+                            WHEN media.content_sha256 = excluded.content_sha256
+                                 AND media.visual_hash <> ''
                             THEN media.visual_hash
                             ELSE excluded.visual_hash
                         END,
                         indexed_at = CURRENT_TIMESTAMP
                     """,
                     (
-                        content_sha256,
                         resolved,
+                        content_sha256,
                         stat.st_size,
                         stat.st_mtime_ns,
                         path.stem,
@@ -264,18 +259,14 @@ class LocalMediaIndex:
                 )
                 refreshed += 1
 
-            rows = list(
-                connection.execute(
-                    "SELECT content_sha256, path FROM media"
-                )
-            )
+            rows = list(connection.execute("SELECT path FROM media"))
             removed = 0
             for row in rows:
                 indexed_path = str(row["path"])
                 if indexed_path not in live_paths:
                     connection.execute(
-                        "DELETE FROM media WHERE content_sha256 = ?",
-                        (str(row["content_sha256"]),),
+                        "DELETE FROM media WHERE path = ?",
+                        (indexed_path,),
                     )
                     removed += 1
 
