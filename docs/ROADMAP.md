@@ -9,7 +9,7 @@ The accepted F001.5 workspace layout remains fixed unless a real usability bug r
 - F005: Context verification/VLM reranking contract — subject, action, location, object, time, visual quality, conflict penalties, confidence thresholds, safe fallback. **PASS**
 - F006: Smart clip planning/extraction — target 5.0s, 3.5–7.0s bounds, shot-aware trim, optional anchor time, safe local FFmpeg extraction. **PASS**
 - F007: Local footage intelligence — incremental indexing, local-first search, content-hash reuse, transcript-aware refresh, perceptual search-by-image baseline. **PASS**
-- F008: Source diversity — anti-adjacent reuse, anti-overlap, source cooldown, duplicate suppression.
+- F008: Source diversity — source cooldown, anti-adjacent reuse, anti-overlap, duplicate suppression, quality guardrails, unresolved flags. **PASS**
 - F009: Preview/accept/reject and A/B quality-evaluation workflow.
 - F010: Real 1–3 minute script acceptance, tuning, and stable manifest adapter for AI_Video_Editor.
 
@@ -26,4 +26,4 @@ Bin Finder follows a clean-room design inspired by common retrieval patterns:
 7. Smart clip planning preserves natural shot boundaries whenever the shot fits the duration policy.
 8. Local indexing is incremental and uses content identity to avoid unnecessary rework.
 9. Local-first discovery can skip external APIs when a strong local match already exists.
-10. The final selector enforces source diversity and non-overlapping ranges.
+10. Final selection enforces source diversity and non-overlapping ranges without forcing low-quality alternatives.
