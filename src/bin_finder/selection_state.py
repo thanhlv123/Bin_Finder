@@ -44,11 +44,17 @@ class SceneSelectionIndex:
     def add_or_replace(self, candidate: CandidateRecord) -> None:
         self._candidates[candidate.scene_id] = candidate
 
+    def get(self, scene_id: str) -> CandidateRecord | None:
+        return self._candidates.get(scene_id)
+
     def ordered_candidates(self) -> list[CandidateRecord]:
         return sorted(
             self._candidates.values(),
             key=lambda candidate: (
-                self.scene_order.get(candidate.scene_id, _fallback_scene_order(candidate.scene_id)),
+                self.scene_order.get(
+                    candidate.scene_id,
+                    _fallback_scene_order(candidate.scene_id),
+                ),
                 candidate.scene_id,
             ),
         )
