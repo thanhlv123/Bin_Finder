@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Iterable
 
 from bin_finder.analysis.fingerprint import fingerprint_file
-from bin_finder.analysis.transcript import load_transcript_sidecar
+from bin_finder.analysis.transcript import find_transcript_sidecar, load_transcript_sidecar
 from bin_finder.retrieval.lexical import BM25Ranker
 from bin_finder.visual_hash import FrameHashExtractor, hamming_similarity
 
@@ -17,9 +17,15 @@ VIDEO_EXTENSIONS = {".mp4", ".mov", ".mkv", ".webm", ".m4v", ".avi"}
 
 
 def default_local_index_path(root: Path) -> Path:
-    digest = hashlib.sha256(str(root.resolve()).casefold().encode("utf-8")).hexdigest()[:20]
+    digest = hashlib.sha256(
+        str(root.resolve()).casefold().encode("utf-8")
+    ).hexdigest()[:20]
     base = os.environ.get("LOCALAPPDATA", "").strip()
-    parent = Path(base) / "BinFinder" / "indexes" if base else Path.cwd() / "indexes"
+    parent = (
+        Path(base) / "BinFinder" / "indexes"
+        if base
+        else Path.cwd() / "indexes"
+    )
     return parent / f"local_{digest}.sqlite3"
 
 
@@ -48,6 +54,7 @@ class LocalSyncStats:
     scanned_files: int
     unchanged_files: int
     hashed_files: int
+    refreshed_records: int
     removed_records: int
     indexed_records: int
 
@@ -61,7 +68,11 @@ class LocalMediaIndex:
         frame_hasher: FrameHashExtractor | None = None,
     ):
         self.root = Path(root).expanduser().resolve()
-        self.db_path = Path(db_path) if db_path is not None else default_local_index_path(self.root)
+        self.db_path = (
+            Path(db_path)
+            if db_path is not None
+            else default_local_index_path(self.root)
+        )
         self.frame_hasher = frame_hasher or FrameHashExtractor()
 
     def _connect(self) -> sqlite3.Connection:
@@ -78,11 +89,28 @@ class LocalMediaIndex:
                 title TEXT NOT NULL,
                 parent_text TEXT NOT NULL,
                 transcript_text TEXT NOT NULL,
+                transcript_path TEXT NOT NULL DEFAULT '',
+                transcript_size INTEGER NOT NULL DEFAULT 0,
+                transcript_mtime_ns INTEGER NOT NULL DEFAULT 0,
                 visual_hash TEXT NOT NULL DEFAULT '',
                 indexed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
             """
         )
+        existing_columns = {
+            str(row["name"])
+            for row in connection.execute("PRAGMA table_info(media)")
+        }
+        migrations = {
+            "transcript_path": "TEXT NOT NULL DEFAULT ''",
+            "transcript_size": "INTEGER NOT NULL DEFAULT 0",
+            "transcript_mtime_ns": "INTEGER NOT NULL DEFAULT 0",
+        }
+        for column, definition in migrations.items():
+            if column not in existing_columns:
+                connection.execute(
+                    f"ALTER TABLE media ADD COLUMN {column} {definition}"
+                )
         connection.execute(
             "CREATE INDEX IF NOT EXISTS idx_media_path ON media(path)"
         )
@@ -99,22 +127,42 @@ class LocalMediaIndex:
         )
 
     @staticmethod
+    def _transcript_signature(path: Path) -> tuple[str, int, int]:
+        sidecar = find_transcript_sidecar(path)
+        if sidecar is None:
+            return "", 0, 0
+        try:
+            stat = sidecar.stat()
+        except OSError:
+            return "", 0, 0
+        return str(sidecar.resolve()), stat.st_size, stat.st_mtime_ns
+
+    @staticmethod
     def _transcript_text(path: Path) -> str:
         try:
             _, _, segments = load_transcript_sidecar(path)
         except OSError:
             return ""
-        return " ".join(segment.text.strip() for segment in segments if segment.text.strip())
+        return " ".join(
+            segment.text.strip()
+            for segment in segments
+            if segment.text.strip()
+        )
 
     def sync(self) -> LocalSyncStats:
-        scanned = unchanged = hashed = 0
+        scanned = unchanged = hashed = refreshed = 0
         live_paths: set[str] = set()
 
         with self._connect() as connection:
             existing_by_path = {
                 str(row["path"]): row
                 for row in connection.execute(
-                    "SELECT content_sha256, path, size_bytes, mtime_ns FROM media"
+                    """
+                    SELECT content_sha256, path, size_bytes, mtime_ns,
+                           transcript_path, transcript_size,
+                           transcript_mtime_ns
+                    FROM media
+                    """
                 )
             }
 
@@ -123,37 +171,66 @@ class LocalMediaIndex:
                 resolved = str(path.resolve())
                 live_paths.add(resolved)
                 stat = path.stat()
+                transcript_path, transcript_size, transcript_mtime = (
+                    self._transcript_signature(path)
+                )
                 existing = existing_by_path.get(resolved)
-                if (
+
+                media_unchanged = (
                     existing is not None
                     and int(existing["size_bytes"]) == stat.st_size
                     and int(existing["mtime_ns"]) == stat.st_mtime_ns
-                ):
+                )
+                transcript_unchanged = (
+                    existing is not None
+                    and str(existing["transcript_path"]) == transcript_path
+                    and int(existing["transcript_size"]) == transcript_size
+                    and int(existing["transcript_mtime_ns"]) == transcript_mtime
+                )
+                if media_unchanged and transcript_unchanged:
                     unchanged += 1
                     continue
 
-                fingerprint = fingerprint_file(path)
-                hashed += 1
+                if media_unchanged and existing is not None:
+                    content_sha256 = str(existing["content_sha256"])
+                else:
+                    fingerprint = fingerprint_file(path)
+                    content_sha256 = fingerprint.sha256
+                    hashed += 1
+
                 transcript_text = self._transcript_text(path)
                 parent_text = " ".join(path.parts[-3:-1])
 
                 duplicate = connection.execute(
-                    "SELECT visual_hash FROM media WHERE content_sha256 = ?",
-                    (fingerprint.sha256,),
+                    """
+                    SELECT visual_hash
+                    FROM media
+                    WHERE content_sha256 = ?
+                    """,
+                    (content_sha256,),
                 ).fetchone()
-                visual_hash = str(duplicate["visual_hash"]) if duplicate is not None else ""
+                visual_hash = (
+                    str(duplicate["visual_hash"])
+                    if duplicate is not None
+                    else ""
+                )
 
                 connection.execute(
-                    "DELETE FROM media WHERE path = ? AND content_sha256 <> ?",
-                    (resolved, fingerprint.sha256),
+                    """
+                    DELETE FROM media
+                    WHERE path = ? AND content_sha256 <> ?
+                    """,
+                    (resolved, content_sha256),
                 )
                 connection.execute(
                     """
                     INSERT INTO media(
                         content_sha256, path, size_bytes, mtime_ns,
-                        title, parent_text, transcript_text, visual_hash
+                        title, parent_text, transcript_text,
+                        transcript_path, transcript_size, transcript_mtime_ns,
+                        visual_hash
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON CONFLICT(content_sha256) DO UPDATE SET
                         path = excluded.path,
                         size_bytes = excluded.size_bytes,
@@ -161,25 +238,37 @@ class LocalMediaIndex:
                         title = excluded.title,
                         parent_text = excluded.parent_text,
                         transcript_text = excluded.transcript_text,
+                        transcript_path = excluded.transcript_path,
+                        transcript_size = excluded.transcript_size,
+                        transcript_mtime_ns = excluded.transcript_mtime_ns,
                         visual_hash = CASE
-                            WHEN media.visual_hash <> '' THEN media.visual_hash
+                            WHEN media.visual_hash <> ''
+                            THEN media.visual_hash
                             ELSE excluded.visual_hash
                         END,
                         indexed_at = CURRENT_TIMESTAMP
                     """,
                     (
-                        fingerprint.sha256,
+                        content_sha256,
                         resolved,
-                        fingerprint.size_bytes,
-                        fingerprint.mtime_ns,
+                        stat.st_size,
+                        stat.st_mtime_ns,
                         path.stem,
                         parent_text,
                         transcript_text,
+                        transcript_path,
+                        transcript_size,
+                        transcript_mtime,
                         visual_hash,
                     ),
                 )
+                refreshed += 1
 
-            rows = list(connection.execute("SELECT content_sha256, path FROM media"))
+            rows = list(
+                connection.execute(
+                    "SELECT content_sha256, path FROM media"
+                )
+            )
             removed = 0
             for row in rows:
                 indexed_path = str(row["path"])
@@ -199,6 +288,7 @@ class LocalMediaIndex:
             scanned_files=scanned,
             unchanged_files=unchanged,
             hashed_files=hashed,
+            refreshed_records=refreshed,
             removed_records=removed,
             indexed_records=indexed_records,
         )
@@ -227,7 +317,12 @@ class LocalMediaIndex:
             for row in rows
         ]
 
-    def search_text(self, query: str, *, limit: int = 20) -> list[tuple[float, LocalIndexRecord]]:
+    def search_text(
+        self,
+        query: str,
+        *,
+        limit: int = 20,
+    ) -> list[tuple[float, LocalIndexRecord]]:
         records = self.records()
         if not records:
             return []
@@ -238,10 +333,19 @@ class LocalMediaIndex:
             for score, record in zip(scores, records)
             if score > 0 or not query.strip()
         ]
-        ranked.sort(key=lambda pair: (-pair[0], pair[1].title.casefold(), pair[1].path.casefold()))
+        ranked.sort(
+            key=lambda pair: (
+                -pair[0],
+                pair[1].title.casefold(),
+                pair[1].path.casefold(),
+            )
+        )
         return ranked[: max(0, limit)]
 
-    def _ensure_visual_hash(self, record: LocalIndexRecord) -> LocalIndexRecord:
+    def _ensure_visual_hash(
+        self,
+        record: LocalIndexRecord,
+    ) -> LocalIndexRecord:
         if record.visual_hash:
             return record
         visual_hash = self.frame_hasher.hash_media(record.path)
@@ -249,7 +353,11 @@ class LocalMediaIndex:
             return record
         with self._connect() as connection:
             connection.execute(
-                "UPDATE media SET visual_hash = ? WHERE content_sha256 = ?",
+                """
+                UPDATE media
+                SET visual_hash = ?
+                WHERE content_sha256 = ?
+                """,
                 (visual_hash, record.content_sha256),
             )
             connection.commit()
@@ -278,7 +386,16 @@ class LocalMediaIndex:
             enriched = self._ensure_visual_hash(record)
             if not enriched.visual_hash:
                 continue
-            score = hamming_similarity(query_hash, enriched.visual_hash)
+            score = hamming_similarity(
+                query_hash,
+                enriched.visual_hash,
+            )
             ranked.append((score, enriched))
-        ranked.sort(key=lambda pair: (-pair[0], pair[1].title.casefold(), pair[1].path.casefold()))
+        ranked.sort(
+            key=lambda pair: (
+                -pair[0],
+                pair[1].title.casefold(),
+                pair[1].path.casefold(),
+            )
+        )
         return ranked[: max(0, limit)]
