@@ -12,7 +12,8 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 - **F006 smart clip planning/extraction:** PASS
 - **F007 local footage intelligence:** PASS
 - **F008 source diversity:** PASS
-- **Next:** F009 preview / accept / reject / A-B evaluation
+- **F009 human review / A-B evaluation:** PASS
+- **Next:** F010 real-script acceptance and AI_Video_Editor adapter
 
 The accepted GUI layout remains fixed. New retrieval capabilities are added behind the existing panels rather than redesigning the workspace.
 
@@ -70,6 +71,10 @@ F007 also exposes local search-by-image using a cached perceptual frame-hash bas
 ## Source diversity
 
 F008 enforces the final source-rotation rules. The same source cannot be adjacent by default, overlapping time ranges from the same source are rejected, duplicate groups can suppress repeated visuals, and near-identical same-source ranges are collapsed. A lower-ranked alternative is used only when it stays within the configured quality-drop guardrail; otherwise the scene remains unresolved instead of forcing poor footage.
+
+## Human review
+
+F009 persists accepted, rejected, and waitlist decisions and records A/B preferences for candidates from the same scene. The controls fit inside the existing review action row, so the accepted panel geometry is unchanged. Review data is stored outside the repository in the local Bin Finder application-data area.
 
 No generic remote downloader is included.
 
