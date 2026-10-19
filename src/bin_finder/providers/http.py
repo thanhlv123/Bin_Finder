@@ -27,7 +27,8 @@ class JsonHttpClient:
             doseq=True,
         )
         url = f"{base_url}?{query}" if query else base_url
-        request = Request(url, headers=headers or {}, method="GET")
+        request_headers = {"User-Agent": "BinFinder/0.1", **(headers or {})}
+        request = Request(url, headers=request_headers, method="GET")
         try:
             with urlopen(request, timeout=timeout) as response:
                 body = response.read(8 * 1024 * 1024 + 1)

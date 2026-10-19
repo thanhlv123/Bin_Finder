@@ -32,6 +32,29 @@ class FakeHttp:
 PROVIDERS = [(PexelsProvider, "videos"), (PixabayProvider, "hits")]
 
 
+@pytest.mark.parametrize("headers,expected_user_agent", [
+    (None, "BinFinder/0.1"),
+    ({"X-Custom": "custom-value"}, "BinFinder/0.1"),
+    ({"User-Agent": "CustomClient/2.0", "X-Custom": "custom-value"}, "CustomClient/2.0"),
+])
+def test_http_client_request_headers(monkeypatch, headers, expected_user_agent):
+    calls = []
+
+    def response(request, *, timeout):
+        calls.append(request)
+        return io.BytesIO(b"{}")
+
+    monkeypatch.setattr("bin_finder.providers.http.urlopen", response)
+    original_headers = None if headers is None else dict(headers)
+    assert JsonHttpClient().get_json("https://example.test/api", headers=headers) == {}
+    request, = calls
+    assert request.get_method() == "GET"
+    assert request.get_header("User-agent") == expected_user_agent
+    for name, value in (headers or {}).items():
+        assert request.get_header(name.capitalize()) == value
+    assert headers == original_headers
+
+
 def payload(key, **extra):
     return {key: [{"id": 7, "duration": 12, **extra}]}
 
@@ -160,6 +183,7 @@ def test_real_http_boundary_uses_video_endpoint_without_media_fetch(monkeypatch,
     result = cls("synthetic-key").search(SearchRequest("s", "car"))
     assert len(result.candidates) == len(calls) == 1
     assert calls[0].full_url.startswith(cls.SEARCH_URL)
+    assert calls[0].get_header("User-agent") == "BinFinder/0.1"
     if cls is PexelsProvider:
         assert calls[0].get_header("Authorization") == "synthetic-key"
     else:
