@@ -101,7 +101,9 @@ class CandidateAnalysisService:
         force: bool = False,
     ) -> CandidateAnalysis | None:
         if candidate.provider != "local":
-            return None
+            from bin_finder.acquisition import verified_candidate_path
+            acquired_path = verified_candidate_path(candidate)
+            return self.analyze_path(acquired_path, force=force) if acquired_path else None
         candidate_path = Path(candidate.preview_url or candidate.source_url)
         if not candidate_path.exists() or not candidate_path.is_file():
             return None

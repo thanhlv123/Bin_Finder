@@ -30,6 +30,8 @@ from bin_finder.gui.panels import (
     SourcePanel,
 )
 from bin_finder.gui.search_worker import SearchWorker
+from bin_finder.gui.acquisition_worker import AcquisitionWorker
+from bin_finder.acquisition import AcquisitionRequest, AcquisitionService
 from bin_finder.gui.theme import APP_STYLE
 from bin_finder.evaluation import ABComparison, ReviewDecision, ReviewStore
 from bin_finder.models import CandidateRecord, SceneRecord
@@ -60,6 +62,8 @@ class MainWindow(QMainWindow):
         self._current_scene = self.scenes[0]
         self._search_workers: set[SearchWorker] = set()
         self._ab_anchor: CandidateRecord | None = None
+        self._acquisition_worker = None
+        self.acquired_assets = {}
 
         project_root = Path(__file__).resolve().parents[3]
         self.provider_config = ProviderConfig.load(project_root)
@@ -127,6 +131,17 @@ class MainWindow(QMainWindow):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(6)
         self.review_panel = ReviewPanel(self.scenes[0])
+        self.acquire_button = QPushButton("Tải footage đã duyệt")
+        self.cancel_acquire_button = QPushButton("Hủy tải")
+        self.cancel_acquire_button.setEnabled(False)
+        self.acquisition_status = QLabel("")
+        acquisition_actions = QHBoxLayout()
+        acquisition_actions.addWidget(self.acquire_button)
+        acquisition_actions.addWidget(self.cancel_acquire_button)
+        acquisition_actions.addWidget(self.acquisition_status)
+        self.review_panel.body.addLayout(acquisition_actions)
+        self.acquire_button.clicked.connect(self._acquire_current_candidate)
+        self.cancel_acquire_button.clicked.connect(self._cancel_acquisition)
         self.export_panel = ExportPanel(self.project_panel)
         right.setFixedWidth(650)
         self.export_panel.setFixedHeight(168)
@@ -335,6 +350,68 @@ class MainWindow(QMainWindow):
 
     def _review_store(self) -> ReviewStore:
         return ReviewStore.for_project(self.project_panel.project_name.text())
+
+    def _acquire_current_candidate(self):
+        candidate = self.review_panel.candidate
+        if candidate is None or self._acquisition_worker is not None:
+            return
+        review = next((item for item in self._review_store().decisions()
+                       if item.scene_id == candidate.scene_id
+                       and item.candidate_id == candidate.candidate_id), None)
+        if review is None or review.decision != "accepted":
+            self.acquisition_status.setText("Cần duyệt chọn trước khi tải.")
+            return
+        if candidate.provider not in {"pexels", "pixabay"}:
+            self.acquisition_status.setText("Nguồn chưa hỗ trợ tải.")
+            return
+        worker = AcquisitionWorker(AcquisitionService(), AcquisitionRequest(candidate, review, True))
+        self._acquisition_worker = worker
+        self.acquire_button.setEnabled(False)
+        self.cancel_acquire_button.setEnabled(True)
+        self.acquisition_status.setText("Đang tải…")
+        worker.progress.connect(self._acquisition_progress)
+        worker.result_ready.connect(self._acquisition_complete)
+        worker.failed.connect(self.acquisition_status.setText)
+        worker.cancelled.connect(self._acquisition_cancelled)
+        worker.finished.connect(self._acquisition_finished)
+        worker.start()
+
+    def _cancel_acquisition(self):
+        if self._acquisition_worker is not None:
+            self._acquisition_worker.requestInterruption()
+
+    def _acquisition_progress(self, done, total):
+        self.acquisition_status.setText(
+            f"Đang tải {min(100, max(0, int(done * 100 / total)))}%" if total else "Đang tải…")
+
+    def _acquisition_complete(self, result):
+        # Retain the reference for explicit local analysis; do not create a clip
+        # or alter human review, scene selection, verification or export state.
+        self.acquired_assets[result.candidate.candidate_id] = result
+        if self.review_panel.candidate == self._acquisition_worker.request.candidate:
+            self.review_panel.set_candidate(result.candidate)
+        self.acquisition_status.setText("Đã có trong cache" if result.cache_hit else "Đã tải")
+
+    def _acquisition_cancelled(self):
+        self.acquisition_status.setText("Đã hủy")
+
+    def _acquisition_finished(self):
+        worker = self._acquisition_worker
+        self._acquisition_worker = None
+        self.acquire_button.setEnabled(True)
+        self.cancel_acquire_button.setEnabled(False)
+        worker.deleteLater()
+
+    def closeEvent(self, event):
+        if self._acquisition_worker is not None:
+            self._cancel_acquisition()
+            self.acquisition_status.setText("Đang hủy; đóng lại khi hoàn tất.")
+            event.ignore()
+            return
+        if any(worker.isRunning() for worker in self._search_workers):
+            event.ignore()
+            return
+        super().closeEvent(event)
 
     def _record_review(self, candidate: CandidateRecord, decision: str):
         self._review_store().record_decision(
