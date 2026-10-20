@@ -13,6 +13,11 @@ The accepted F001.5 workspace layout remains fixed unless a real usability bug r
 - F009: Human review — persistent accept/reject/waitlist decisions, A/B comparisons, evaluation summaries, compact review controls. **PASS**
 - F010: Real 1–3 minute script acceptance, unresolved-scene gating, quality metrics, and stable AI_Video_Editor manifest adapter. **PASS**
 
+F014: Workflow review and explicit final clip selection integration. **PASS (offline)**.
+Reuses F008 diversity and F010 acceptance/adapter; candidate acceptance remains
+separate from final clip approval. See
+[F014 contract](F014_WORKFLOW_REVIEW_FINAL_SELECTION.md).
+
 ## Architecture principles learned from public footage-search projects
 
 Bin Finder follows a clean-room design inspired by common retrieval patterns:

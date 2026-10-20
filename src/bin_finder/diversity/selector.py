@@ -212,6 +212,7 @@ class SourceDiversitySelector:
                     reason=reason,
                     best_score=best_score,
                     considered_count=len(scene_candidates),
+                    conflict_reasons=tuple(dict.fromkeys(conflict_reasons)),
                 )
             )
 
