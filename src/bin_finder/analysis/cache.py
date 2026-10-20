@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+from collections.abc import Iterator
+from contextlib import closing, contextmanager
 from pathlib import Path
 
 from bin_finder.analysis.models import CandidateAnalysis
@@ -23,24 +25,31 @@ class AnalysisCache:
 
     def _connect(self) -> sqlite3.Connection:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(self.path, timeout=10.0)
-        connection.execute(
-            """
-            CREATE TABLE IF NOT EXISTS analysis_cache (
-                cache_key TEXT PRIMARY KEY,
-                sha256 TEXT NOT NULL,
-                transcript_sha256 TEXT NOT NULL,
-                analyzer_version TEXT NOT NULL,
-                payload_json TEXT NOT NULL,
-                created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-            )
-            """
-        )
-        connection.execute(
-            "CREATE INDEX IF NOT EXISTS idx_analysis_identity "
-            "ON analysis_cache(sha256, transcript_sha256, analyzer_version)"
-        )
-        return connection
+        return sqlite3.connect(self.path, timeout=10.0)
+
+    @contextmanager
+    def _connection(self) -> Iterator[sqlite3.Connection]:
+        # SQLite's transaction context commits/rolls back but does not close.
+        # Own the handle before schema setup so initialization failures close it too.
+        with closing(self._connect()) as connection:
+            with connection:
+                connection.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS analysis_cache (
+                        cache_key TEXT PRIMARY KEY,
+                        sha256 TEXT NOT NULL,
+                        transcript_sha256 TEXT NOT NULL,
+                        analyzer_version TEXT NOT NULL,
+                        payload_json TEXT NOT NULL,
+                        created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+                    )
+                    """
+                )
+                connection.execute(
+                    "CREATE INDEX IF NOT EXISTS idx_analysis_identity "
+                    "ON analysis_cache(sha256, transcript_sha256, analyzer_version)"
+                )
+                yield connection
 
     def get(
         self,
@@ -50,7 +59,7 @@ class AnalysisCache:
     ) -> CandidateAnalysis | None:
         transcript_identity = transcript_sha256 or "none"
         cache_key = f"{sha256}:{transcript_identity}:{analyzer_version}"
-        with self._connect() as connection:
+        with self._connection() as connection:
             row = connection.execute(
                 "SELECT payload_json FROM analysis_cache WHERE cache_key = ?",
                 (cache_key,),
@@ -71,7 +80,7 @@ class AnalysisCache:
             ensure_ascii=False,
             separators=(",", ":"),
         )
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute(
                 """
                 INSERT INTO analysis_cache(
@@ -94,11 +103,9 @@ class AnalysisCache:
                     payload,
                 ),
             )
-            connection.commit()
 
     def clear(self) -> None:
         if not self.path.exists():
             return
-        with self._connect() as connection:
+        with self._connection() as connection:
             connection.execute("DELETE FROM analysis_cache")
-            connection.commit()

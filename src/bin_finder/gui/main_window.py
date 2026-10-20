@@ -31,6 +31,8 @@ from bin_finder.gui.panels import (
 )
 from bin_finder.gui.search_worker import SearchWorker
 from bin_finder.gui.acquisition_worker import AcquisitionWorker
+from bin_finder.gui.workflow_worker import WorkflowWorker
+from bin_finder.workflow import WorkflowRequest, WorkflowService
 from bin_finder.acquisition import AcquisitionRequest, AcquisitionService
 from bin_finder.gui.theme import APP_STYLE
 from bin_finder.evaluation import ABComparison, ReviewDecision, ReviewStore
@@ -64,6 +66,8 @@ class MainWindow(QMainWindow):
         self._ab_anchor: CandidateRecord | None = None
         self._acquisition_worker = None
         self.acquired_assets = {}
+        self._workflow_worker = None
+        self.workflow_results = {}
 
         project_root = Path(__file__).resolve().parents[3]
         self.provider_config = ProviderConfig.load(project_root)
@@ -142,6 +146,17 @@ class MainWindow(QMainWindow):
         self.review_panel.body.addLayout(acquisition_actions)
         self.acquire_button.clicked.connect(self._acquire_current_candidate)
         self.cancel_acquire_button.clicked.connect(self._cancel_acquisition)
+        self.workflow_button = QPushButton("Tải và phân tích tư liệu đã duyệt")
+        self.cancel_workflow_button = QPushButton("Hủy xử lý")
+        self.cancel_workflow_button.setEnabled(False)
+        self.workflow_status = QLabel("")
+        workflow_actions = QHBoxLayout()
+        workflow_actions.addWidget(self.workflow_button)
+        workflow_actions.addWidget(self.cancel_workflow_button)
+        workflow_actions.addWidget(self.workflow_status)
+        self.review_panel.body.addLayout(workflow_actions)
+        self.workflow_button.clicked.connect(self._process_current_candidate)
+        self.cancel_workflow_button.clicked.connect(self._cancel_workflow)
         self.export_panel = ExportPanel(self.project_panel)
         right.setFixedWidth(650)
         self.export_panel.setFixedHeight(168)
@@ -353,7 +368,7 @@ class MainWindow(QMainWindow):
 
     def _acquire_current_candidate(self):
         candidate = self.review_panel.candidate
-        if candidate is None or self._acquisition_worker is not None:
+        if candidate is None or self._acquisition_worker is not None or self._workflow_worker is not None:
             return
         review = next((item for item in self._review_store().decisions()
                        if item.scene_id == candidate.scene_id
@@ -402,7 +417,68 @@ class MainWindow(QMainWindow):
         self.cancel_acquire_button.setEnabled(False)
         worker.deleteLater()
 
+    def _process_current_candidate(self):
+        candidate = self.review_panel.candidate
+        if candidate is None or self._workflow_worker is not None or self._acquisition_worker is not None:
+            return
+        request = WorkflowRequest(tuple(self.scenes), (candidate,),
+                                  self._review_store().decisions(), True)
+        worker = WorkflowWorker(WorkflowService(
+            project_id=self.project_panel.project_name.text()), request)
+        self._workflow_worker = worker
+        self.workflow_button.setEnabled(False)
+        self.acquire_button.setEnabled(False)
+        self.cancel_workflow_button.setEnabled(True)
+        worker.progress.connect(self._workflow_progress)
+        worker.result_ready.connect(self._workflow_complete)
+        worker.failed.connect(self.workflow_status.setText)
+        worker.cancelled.connect(self._workflow_cancelled)
+        worker.finished.connect(self._workflow_finished)
+        worker.start()
+
+    def _cancel_workflow(self):
+        if self._workflow_worker is not None:
+            self._workflow_worker.requestInterruption()
+
+    def _workflow_progress(self, event):
+        labels = {"acquiring": "Đang tải…", "analyzing": "Đang phân tích…",
+                  "analyzed": "Đã phân tích", "failed": "Thất bại",
+                  "cancelled": "Đã hủy", "skipped": "Cần cho phép tải"}
+        text = labels.get(event.stage, "Đang xử lý…")
+        if event.percent is not None:
+            text += f" {event.percent}%"
+        self.workflow_status.setText(text)
+
+    def _workflow_complete(self, result):
+        for item in result.items:
+            key = (item.candidate.scene_id, item.candidate.candidate_id,
+                   item.candidate.provider, item.candidate.source_id)
+            self.workflow_results[key] = item
+            current = self.review_panel.candidate
+            if current is not None and key == (current.scene_id, current.candidate_id,
+                                               current.provider, current.source_id):
+                self.review_panel.set_candidate(item.candidate)
+        failed = next((item for item in result.items if item.stage != "analyzed"), None)
+        self.workflow_status.setText(
+            f"Chưa hoàn tất: {failed.message}" if failed else "Hoàn tất; cần kiểm tra và duyệt cuối")
+
+    def _workflow_cancelled(self):
+        self.workflow_status.setText("Đã hủy")
+
+    def _workflow_finished(self):
+        worker = self._workflow_worker
+        self._workflow_worker = None
+        self.workflow_button.setEnabled(True)
+        self.acquire_button.setEnabled(True)
+        self.cancel_workflow_button.setEnabled(False)
+        worker.deleteLater()
+
     def closeEvent(self, event):
+        if self._workflow_worker is not None:
+            self._cancel_workflow()
+            self.workflow_status.setText("Đang hủy; đóng lại khi hoàn tất.")
+            event.ignore()
+            return
         if self._acquisition_worker is not None:
             self._cancel_acquisition()
             self.acquisition_status.setText("Đang hủy; đóng lại khi hoàn tất.")
