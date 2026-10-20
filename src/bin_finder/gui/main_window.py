@@ -32,6 +32,9 @@ from bin_finder.gui.panels import (
 from bin_finder.gui.search_worker import SearchWorker
 from bin_finder.gui.acquisition_worker import AcquisitionWorker
 from bin_finder.gui.workflow_worker import WorkflowWorker
+from bin_finder.gui.final_review_worker import FinalReviewWorker
+from bin_finder.final_selection import build_final_project, handoff_final_project
+from bin_finder.acceptance import evaluate_project
 from bin_finder.workflow import WorkflowRequest, WorkflowService
 from bin_finder.acquisition import AcquisitionRequest, AcquisitionService
 from bin_finder.gui.theme import APP_STYLE
@@ -68,6 +71,11 @@ class MainWindow(QMainWindow):
         self.acquired_assets = {}
         self._workflow_worker = None
         self.workflow_results = {}
+        self.final_selections = ()
+        self._final_worker = None
+        self._final_item = None
+        self._final_options = ()
+        self._final_generation = 0
 
         project_root = Path(__file__).resolve().parents[3]
         self.provider_config = ProviderConfig.load(project_root)
@@ -135,6 +143,8 @@ class MainWindow(QMainWindow):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(6)
         self.review_panel = ReviewPanel(self.scenes[0])
+        self.review_panel.choose.setText("Chọn candidate")
+        self.review_panel.choose.setToolTip("Duyệt candidate để tải/phân tích; chưa duyệt clip cuối")
         self.acquire_button = QPushButton("Tải footage đã duyệt")
         self.cancel_acquire_button = QPushButton("Hủy tải")
         self.cancel_acquire_button.setEnabled(False)
@@ -157,7 +167,23 @@ class MainWindow(QMainWindow):
         self.review_panel.body.addLayout(workflow_actions)
         self.workflow_button.clicked.connect(self._process_current_candidate)
         self.cancel_workflow_button.clicked.connect(self._cancel_workflow)
+        self.prepare_final_button = QPushButton("Chuẩn bị clip cuối")
+        self.final_button = QPushButton("Duyệt clip cuối")
+        self.final_button.setEnabled(False)
+        self.final_options_combo = QComboBox()
+        final_actions = QHBoxLayout()
+        final_actions.addWidget(self.prepare_final_button)
+        final_actions.addWidget(self.final_options_combo, 1)
+        final_actions.addWidget(self.final_button)
+        self.review_panel.body.addLayout(final_actions)
+        self.prepare_final_button.clicked.connect(self._prepare_final)
+        self.final_button.clicked.connect(self._approve_final)
         self.export_panel = ExportPanel(self.project_panel)
+        self.export_panel.export.setText("Tạo gói AI_Video_Editor")
+        self.export_panel.export.clicked.connect(self._handoff_final)
+        self.export_panel.dest.textChanged.connect(self._refresh_acceptance)
+        self.project_panel.project_name.textChanged.connect(self._project_changed)
+        self._refresh_acceptance()
         right.setFixedWidth(650)
         self.export_panel.setFixedHeight(168)
         right_layout.addWidget(self.review_panel, 1)
@@ -169,6 +195,7 @@ class MainWindow(QMainWindow):
 
         self.scene_panel.scene_changed.connect(self._scene_changed)
         self.search_panel.candidate_changed.connect(self.review_panel.set_candidate)
+        self.search_panel.candidate_changed.connect(self._clear_final_options)
         self.review_panel.select_candidate.connect(self._candidate_selected)
         self.review_panel.waitlist_candidate.connect(self._candidate_waitlisted)
         self.review_panel.reject_candidate.connect(self._candidate_rejected)
@@ -234,6 +261,7 @@ class MainWindow(QMainWindow):
 
     def _scene_changed(self, scene: SceneRecord):
         self._current_scene = scene
+        self._clear_final_options()
         self.review_panel.set_scene(scene)
         self._search_scene(scene)
 
@@ -400,6 +428,7 @@ class MainWindow(QMainWindow):
             f"Đang tải {min(100, max(0, int(done * 100 / total)))}%" if total else "Đang tải…")
 
     def _acquisition_complete(self, result):
+        self._clear_final_options()
         # Retain the reference for explicit local analysis; do not create a clip
         # or alter human review, scene selection, verification or export state.
         self.acquired_assets[result.candidate.candidate_id] = result
@@ -421,6 +450,7 @@ class MainWindow(QMainWindow):
         candidate = self.review_panel.candidate
         if candidate is None or self._workflow_worker is not None or self._acquisition_worker is not None:
             return
+        self._clear_final_options()
         request = WorkflowRequest(tuple(self.scenes), (candidate,),
                                   self._review_store().decisions(), True)
         worker = WorkflowWorker(WorkflowService(
@@ -450,6 +480,7 @@ class MainWindow(QMainWindow):
         self.workflow_status.setText(text)
 
     def _workflow_complete(self, result):
+        self._clear_final_options()
         for item in result.items:
             key = (item.candidate.scene_id, item.candidate.candidate_id,
                    item.candidate.provider, item.candidate.source_id)
@@ -474,6 +505,9 @@ class MainWindow(QMainWindow):
         worker.deleteLater()
 
     def closeEvent(self, event):
+        if self._final_worker is not None:
+            event.ignore()
+            return
         if self._workflow_worker is not None:
             self._cancel_workflow()
             self.workflow_status.setText("Đang hủy; đóng lại khi hoàn tất.")
@@ -508,8 +542,7 @@ class MainWindow(QMainWindow):
         if candidate is None:
             return
         self._record_review(candidate, "accepted")
-        self.scene_panel.mark_selected(candidate.scene_id)
-        self.selected_panel.add_or_replace_candidate(candidate)
+        self.workflow_status.setText("Đã duyệt candidate; cần duyệt clip cuối")
 
     def _candidate_waitlisted(self, candidate: CandidateRecord | None):
         if candidate is None:
@@ -580,6 +613,10 @@ class MainWindow(QMainWindow):
             for index, chunk in enumerate(chunks, start=1)
         ]
         self.scenes = scenes
+        self.final_selections = ()
+        self.workflow_results.clear()
+        self._clear_final_options()
+        self._refresh_acceptance()
         self._current_scene = scenes[0]
         self.scene_panel.set_scenes(scenes)
         self.selected_panel.reset(total_scenes=len(scenes), scenes=scenes)
@@ -587,3 +624,117 @@ class MainWindow(QMainWindow):
         self._ab_anchor = None
         self.review_panel.set_comparison_pending(False)
         self._search_scene(scenes[0])
+
+    def _project_changed(self):
+        self.final_selections = ()
+        self.workflow_results.clear()
+        self._clear_final_options()
+        self.selected_panel.reset(len(self.scenes), self.scenes)
+        self.scene_panel.set_scenes(self.scenes)
+        self._refresh_acceptance()
+
+    def _clear_final_options(self, *_):
+        self._final_generation += 1
+        self._final_item = None
+        self._final_options = ()
+        self.final_options_combo.clear()
+        self.final_button.setEnabled(False)
+
+    def _final_context(self):
+        return (self.project_panel.project_name.text(), tuple(self.scenes), self.final_selections, self._final_generation)
+
+    def _start_final_worker(self, item, clip_id=None):
+        if self._final_worker is not None:
+            return
+        scene = next((s for s in self.scenes if s.scene_id == item.candidate.scene_id), None)
+        if scene is None:
+            return
+        worker = FinalReviewWorker(scene, item, self.scenes, self.final_selections, clip_id)
+        self._final_worker = worker
+        self._final_worker_context = self._final_context()
+        self.final_button.setEnabled(False)
+        self.prepare_final_button.setEnabled(False)
+        worker.result_ready.connect(self._final_complete)
+        worker.failed.connect(self.workflow_status.setText)
+        worker.finished.connect(self._final_finished)
+        worker.start()
+
+    def _prepare_final(self):
+        current = self.review_panel.candidate
+        if current is None:
+            return
+        key = (current.scene_id, current.candidate_id, current.provider, current.source_id)
+        item = self.workflow_results.get(key)
+        self._clear_final_options()
+        if item is None:
+            self.workflow_status.setText("Clip chưa sẵn sàng")
+            return
+        self._start_final_worker(item)
+
+    def _approve_final(self):
+        index = self.final_options_combo.currentIndex()
+        if self._final_item is not None and 0 <= index < len(self._final_options):
+            self._start_final_worker(self._final_item, self._final_options[index].clip_id)
+
+    def _final_complete(self, result):
+        worker = self._final_worker
+        if self._final_worker_context != self._final_context():
+            return
+        if worker.clip_id is None:
+            current = self.review_panel.candidate
+            if current is None or (current.scene_id, current.candidate_id, current.provider, current.source_id) != (
+                    worker.item.candidate.scene_id, worker.item.candidate.candidate_id,
+                    worker.item.candidate.provider, worker.item.candidate.source_id):
+                return
+            self._final_item, self._final_options = result
+            self.final_options_combo.clear()
+            for option in self._final_options:
+                p = option.proposal
+                self.final_options_combo.addItem(f"{p.start:.2f}–{p.end:.2f}s | {option.final_score:.2f}")
+            self.workflow_status.setText("Cần duyệt clip cuối" if self._final_options else "Clip chưa sẵn sàng")
+        elif result.accepted:
+            self.final_selections = result.selections
+            self.selected_panel.set_final_clips(self.final_selections, self.scenes)
+            self.scene_panel.mark_selected(worker.scene.scene_id)
+            self.workflow_status.setText("Đã duyệt clip cuối")
+            self._refresh_acceptance()
+        else:
+            self.workflow_status.setText("Không thể duyệt: " + result.reason)
+
+    def _final_finished(self):
+        worker = self._final_worker
+        self._final_worker = None
+        self.prepare_final_button.setEnabled(True)
+        self.final_button.setEnabled(bool(self._final_options))
+        worker.deleteLater()
+
+    def _refresh_acceptance(self, *_):
+        project = build_final_project(self.project_panel.project_name.text(), self.scenes,
+                                      self.final_selections, self.export_panel.dest.text())
+        self.acceptance_report = evaluate_project(project)
+        r = self.acceptance_report
+        reasons = []
+        if r.unresolved_scene_ids:
+            reasons.append("Chưa đủ cảnh")
+        if r.low_score_scene_ids:
+            reasons.append("Điểm cuối thấp")
+        if r.source_rotation_issues:
+            reasons.append("Xung đột nguồn")
+        if r.overlap_issues:
+            reasons.append("Trùng khoảng thời gian")
+        if r.duration_issue:
+            reasons.append(r.duration_issue)
+        self.export_panel.export.setEnabled(r.ready)
+        self.export_panel.export.setToolTip("Sẵn sàng xuất" if r.ready else "; ".join(reasons))
+        self.export_panel.title_label.setText("Xuất footage · " + ("Sẵn sàng xuất" if r.ready else "; ".join(reasons)))
+
+    def _handoff_final(self):
+        self._refresh_acceptance()
+        if not self.acceptance_report.ready:
+            return
+        try:
+            handoff_final_project(self.project_panel.project_name.text(), self.scenes,
+                                  self.final_selections, self.export_panel.dest.text())
+            self.workflow_status.setText("Đã tạo gói AI_Video_Editor")
+        except Exception:
+            self.workflow_status.setText("Không thể tạo gói tích hợp")

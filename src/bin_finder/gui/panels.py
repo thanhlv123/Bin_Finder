@@ -713,6 +713,16 @@ class SelectedPanel(Panel):
         self._selection.add_or_replace(candidate)
         self._rebuild_cards()
 
+    def set_final_clips(self, clips, scenes):
+        # CandidateRecord is a presentation projection only; F014 owns final truth.
+        self.reset(len(scenes), scenes)
+        for clip in clips:
+            self._selection.add_or_replace(CandidateRecord(
+                clip.clip_id, clip.scene_id, clip.provider, clip.source_id, clip.title,
+                clip.duration, clip.final_score, clip.rights_status,
+                proposed_start=clip.start, proposed_end=clip.end))
+        self._rebuild_cards()
+
     def ordered_scene_ids(self) -> list[str]:
         return self._selection.ordered_scene_ids()
 

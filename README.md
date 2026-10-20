@@ -14,6 +14,12 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 - **F008 source diversity:** PASS
 - **F009 human review / A-B evaluation:** PASS
 - **F010 acceptance gate / AI_Video_Editor adapter:** PASS
+- **F014 workflow review / explicit final clip selection:** PASS (offline)
+
+Candidate approval for acquisition/analysis is separate from final clip approval.
+Only explicitly approved, verified local clip proposals create final selections
+and count toward F010 readiness. Package handoff remains an explicit READY-only
+action. See [F014 details](docs/F014_WORKFLOW_REVIEW_FINAL_SELECTION.md).
 
 The accepted GUI layout remains fixed. New retrieval capabilities are added behind the existing panels rather than redesigning the workspace.
 

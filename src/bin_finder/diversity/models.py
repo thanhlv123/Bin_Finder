@@ -90,6 +90,7 @@ class SelectionDecision:
     selected_score: float | None = None
     score_drop: float | None = None
     considered_count: int = 0
+    conflict_reasons: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
