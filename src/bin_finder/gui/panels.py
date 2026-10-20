@@ -824,18 +824,34 @@ class ExportPanel(Panel):
             ("Tạo index CSV", "Tạo footage_index.csv"),
             ("Lưu metadata & điểm", "Lưu metadata nguồn & điểm số"),
         )
+        self.export_options = []
         for index, (label, tooltip) in enumerate(option_specs):
             cb = QCheckBox(label)
             cb.setToolTip(tooltip)
             cb.setChecked(True)
+            self.export_options.append(cb)
             options.addWidget(cb, index // 2, index % 2)
+        for index in (0, 2):
+            self.export_options[index].setEnabled(False)
+        self.export_options[0].setToolTip("Xuất thư viện luôn cắt theo timestamp đã duyệt")
+        self.export_options[2].setToolTip("Manifest JSON bắt buộc để xác nhận thư viện hoàn chỉnh")
+        self.export_options[4].setToolTip("Lưu provenance mở rộng; ID, điểm và quyền luôn có trong manifest")
+        self.adapter_option = QCheckBox("Tạo gói AI_Video_Editor")
+        options.addWidget(self.adapter_option, 2, 1)
         content.addLayout(options, 52)
         self.body.addLayout(content, 1)
 
         self.export = QPushButton("⇩  Xuất footage đã chọn")
         self.export.setObjectName("success")
         self.export.setFixedHeight(32)
-        self.body.addWidget(self.export)
+        export_row = QHBoxLayout()
+        export_row.addWidget(self.export, 1)
+        self.cancel_export = QPushButton("Hủy")
+        self.cancel_export.setEnabled(False)
+        export_row.addWidget(self.cancel_export)
+        self.body.addLayout(export_row)
+        self.export_status = QLabel("")
+        self.body.addWidget(self.export_status)
 
     def _choose(self):
         folder = QFileDialog.getExistingDirectory(self, "Chọn thư mục xuất footage")

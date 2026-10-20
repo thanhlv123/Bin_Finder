@@ -33,7 +33,9 @@ from bin_finder.gui.search_worker import SearchWorker
 from bin_finder.gui.acquisition_worker import AcquisitionWorker
 from bin_finder.gui.workflow_worker import WorkflowWorker
 from bin_finder.gui.final_review_worker import FinalReviewWorker
-from bin_finder.final_selection import build_final_project, handoff_final_project
+from bin_finder.final_selection import build_final_project
+from bin_finder.final_export import ExportOptions
+from bin_finder.gui.final_export_worker import FinalExportWorker
 from bin_finder.acceptance import evaluate_project
 from bin_finder.workflow import WorkflowRequest, WorkflowService
 from bin_finder.acquisition import AcquisitionRequest, AcquisitionService
@@ -73,6 +75,7 @@ class MainWindow(QMainWindow):
         self.workflow_results = {}
         self.final_selections = ()
         self._final_worker = None
+        self._export_worker = None
         self._final_item = None
         self._final_options = ()
         self._final_generation = 0
@@ -179,8 +182,8 @@ class MainWindow(QMainWindow):
         self.prepare_final_button.clicked.connect(self._prepare_final)
         self.final_button.clicked.connect(self._approve_final)
         self.export_panel = ExportPanel(self.project_panel)
-        self.export_panel.export.setText("Tạo gói AI_Video_Editor")
-        self.export_panel.export.clicked.connect(self._handoff_final)
+        self.export_panel.export.clicked.connect(self._export_final)
+        self.export_panel.cancel_export.clicked.connect(self._cancel_export)
         self.export_panel.dest.textChanged.connect(self._refresh_acceptance)
         self.project_panel.project_name.textChanged.connect(self._project_changed)
         self._refresh_acceptance()
@@ -505,6 +508,10 @@ class MainWindow(QMainWindow):
         worker.deleteLater()
 
     def closeEvent(self, event):
+        if self._export_worker is not None:
+            self._cancel_export()
+            event.ignore()
+            return
         if self._final_worker is not None:
             event.ignore()
             return
@@ -724,17 +731,47 @@ class MainWindow(QMainWindow):
             reasons.append("Trùng khoảng thời gian")
         if r.duration_issue:
             reasons.append(r.duration_issue)
-        self.export_panel.export.setEnabled(r.ready)
+        self.export_panel.export.setEnabled(r.ready and self._export_worker is None)
         self.export_panel.export.setToolTip("Sẵn sàng xuất" if r.ready else "; ".join(reasons))
         self.export_panel.title_label.setText("Xuất footage · " + ("Sẵn sàng xuất" if r.ready else "; ".join(reasons)))
 
-    def _handoff_final(self):
+    def _export_final(self):
         self._refresh_acceptance()
-        if not self.acceptance_report.ready:
+        if not self.acceptance_report.ready or self._export_worker is not None:
             return
-        try:
-            handoff_final_project(self.project_panel.project_name.text(), self.scenes,
-                                  self.final_selections, self.export_panel.dest.text())
-            self.workflow_status.setText("Đã tạo gói AI_Video_Editor")
-        except Exception:
-            self.workflow_status.setText("Không thể tạo gói tích hợp")
+        checks = self.export_panel.export_options
+        options = ExportOptions(csv_index=checks[3].isChecked(),
+            integration_adapter=self.export_panel.adapter_option.isChecked(),
+            scene_id_filenames=checks[1].isChecked(), include_metadata=checks[4].isChecked())
+        worker = FinalExportWorker(self.project_panel.project_name.text(), self.scenes,
+            self.final_selections, self.export_panel.dest.text(), options)
+        self._export_worker = worker
+        worker.progress.connect(self._export_progress)
+        worker.result_ready.connect(self._export_complete)
+        worker.failed.connect(self.export_panel.export_status.setText)
+        worker.finished.connect(self._export_finished)
+        self.export_panel.export.setEnabled(False)
+        self.export_panel.cancel_export.setEnabled(True)
+        self.export_panel.export_status.setText("Đang xuất footage…")
+        worker.start()
+
+    def _cancel_export(self):
+        if self._export_worker is not None:
+            self._export_worker.requestInterruption()
+            self.export_panel.export_status.setText("Đang hủy; chờ lần cắt hiện tại hoàn tất")
+
+    def _export_progress(self, progress):
+        self.export_panel.export_status.setText(
+            f"{progress.completed}/{progress.total} · {progress.scene_id}")
+
+    def _export_complete(self, result):
+        messages = {"success": "Đã xuất footage", "cancelled": "Đã hủy xuất footage",
+                    "failed": "Xuất thất bại: " + result.error, "not_ready": "Chưa READY"}
+        self.export_panel.export_status.setText(messages[result.status])
+
+    def _export_finished(self):
+        worker = self._export_worker
+        self._export_worker = None
+        self.export_panel.cancel_export.setEnabled(False)
+        self._refresh_acceptance()
+        worker.deleteLater()

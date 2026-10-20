@@ -15,11 +15,21 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 - **F009 human review / A-B evaluation:** PASS
 - **F010 acceptance gate / AI_Video_Editor adapter:** PASS
 - **F014 workflow review / explicit final clip selection:** PASS (offline)
+- **F015 final footage export library:** PASS (offline + real FFmpeg smoke)
 
 Candidate approval for acquisition/analysis is separate from final clip approval.
 Only explicitly approved, verified local clip proposals create final selections
 and count toward F010 readiness. Package handoff remains an explicit READY-only
 action. See [F014 details](docs/F014_WORKFLOW_REVIEW_FINAL_SELECTION.md).
+
+Panel 7 now explicitly exports READY final selections through the existing F006
+extractor into one MP4 per scene, with an atomic completion manifest and optional
+CSV index. Source hashes are revalidated; incomplete, cancelled or failed runs
+publish no completed library, and existing completed exports are never overwritten.
+An optional F010 adapter references the extracted files with local 0-based ranges,
+using the original source-coordinate readiness report. Original source ranges and
+hashes remain in the F015 manifest. No final video is rendered. See
+[F015 usage and offline FFmpeg acceptance](docs/F015_FINAL_FOOTAGE_EXPORT.md).
 
 The accepted GUI layout remains fixed. New retrieval capabilities are added behind the existing panels rather than redesigning the workspace.
 
