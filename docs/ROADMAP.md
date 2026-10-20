@@ -18,6 +18,17 @@ Reuses F008 diversity and F010 acceptance/adapter; candidate acceptance remains
 separate from final clip approval. See
 [F014 contract](F014_WORKFLOW_REVIEW_FINAL_SELECTION.md).
 
+F015: Final footage export library. **PASS (offline + real FFmpeg smoke)**.
+READY-only explicit export reuses F006 extraction, validates approved source
+hashes, publishes a complete scene-ordered library atomically, and writes a
+versioned manifest with optional CSV and materialized F010 adapter. Cooperative
+QThread cancellation leaves no completed partial library. Original F010 source
+coordinates authorize export; adapter coordinates are local to trimmed clips.
+A–B–A passes without changing F010 overlap semantics or adapter v1. Acceptance:
+53 focused passed, 363 full regression passed, one Windows symlink-privilege skip;
+real offline FFmpeg A–B–A smoke passed. See
+[F015 contract](F015_FINAL_FOOTAGE_EXPORT.md).
+
 ## Architecture principles learned from public footage-search projects
 
 Bin Finder follows a clean-room design inspired by common retrieval patterns:
