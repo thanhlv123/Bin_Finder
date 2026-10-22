@@ -23,6 +23,20 @@ def safe_text(value, limit=50000):
     return value
 
 
+def _snapshot_text(value, limit=50000):
+    text = safe_text(value, limit)
+    forbidden = ("authorization:", "bearer ", "api_key", "access_token",
+                 "client_secret", "secret=", "token=", "password=", "signature=")
+    if any(marker in text.lower() for marker in forbidden):
+        raise SessionError("unsafe-snapshot-text")
+    for name, secret in os.environ.items():
+        if (name.startswith("BIN_FINDER_") and
+                ("KEY" in name or "SECRET" in name) and
+                secret and secret in text):
+            raise SessionError("unsafe-snapshot-text")
+    return text
+
+
 def scene_to_data(scene):
     if not isinstance(scene, SceneRecord):
         raise SessionError("invalid-scene")
@@ -31,12 +45,12 @@ def scene_to_data(scene):
     if not math.isfinite(scene.target_duration) or scene.target_duration <= 0:
         raise SessionError("invalid-duration")
     return {
-        "scene_id": safe_text(scene.scene_id, 128),
+        "scene_id": _snapshot_text(scene.scene_id, 128),
         "order": scene.order,
-        "english_text": safe_text(scene.english_text),
-        "vietnamese_text": safe_text(scene.vietnamese_text),
+        "english_text": _snapshot_text(scene.english_text),
+        "vietnamese_text": _snapshot_text(scene.vietnamese_text),
         "target_duration": scene.target_duration,
-        "context": {key: [safe_text(x, 1024) for x in getattr(scene.context, key)]
+        "context": {key: [_snapshot_text(x, 1024) for x in getattr(scene.context, key)]
                     for key in CONTEXT},
     }
 
@@ -191,6 +205,6 @@ def validate_snapshot(payload):
     if not isinstance(payload["ui_state"], dict) or set(payload["ui_state"]) - {
             "script_text", "output_dir", "current_scene_id"}:
         raise SessionError("invalid-ui")
-    return {"format": FORMAT, "project_id": safe_text(payload["project_id"], 128),
+    return {"format": FORMAT, "project_id": _snapshot_text(payload["project_id"], 128),
             "scenes": scenes, "final_selections": selections, "workflow_refs": [],
-            "ui_state": {key: safe_text(value) for key, value in payload["ui_state"].items()}}
+            "ui_state": {key: _snapshot_text(value) for key, value in payload["ui_state"].items()}}

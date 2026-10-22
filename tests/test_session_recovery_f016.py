@@ -97,3 +97,28 @@ def test_symlinked_store_root_refused(tmp_path):
         pytest.skip("symlink privileges unavailable")
     with pytest.raises(SessionStoreError):
         SessionStore(link).save(sample())
+
+
+@pytest.mark.parametrize("section", ["script", "scene", "project"])
+def test_snapshot_rejects_credentials_and_preserves_previous_data(tmp_path, section):
+    store = SessionStore(tmp_path / "sessions")
+    baseline = sample()
+    store.save(baseline)
+    payload = sample()
+    if section == "script":
+        payload["ui_state"]["script_text"] = "Authorization: Bearer test-credential"
+    elif section == "scene":
+        payload["scenes"][0]["english_text"] = "api_key=test-credential"
+    else:
+        payload["project_id"] = "token=test-credential"
+    with pytest.raises(SessionError, match="unsafe-snapshot-text"):
+        store.save(payload)
+    assert store.load_active() == validate_snapshot(baseline)
+
+
+def test_snapshot_rejects_environment_secret_in_script(tmp_path, monkeypatch):
+    monkeypatch.setenv("BIN_FINDER_F016_TEST_SECRET", "unique-test-credential")
+    payload = sample()
+    payload["ui_state"]["script_text"] = "unique-test-credential"
+    with pytest.raises(SessionError, match="unsafe-snapshot-text"):
+        SessionStore(tmp_path / "sessions").save(payload)

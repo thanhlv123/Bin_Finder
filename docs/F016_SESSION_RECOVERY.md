@@ -9,7 +9,7 @@ snapshot. The new `session_store` stores it in a per-project SHA-256-named
 file under `%LOCALAPPDATA%/BinFinder/sessions` (or
 `~/.bin_finder/sessions` when LOCALAPPDATA is absent). A small active
 pointer tracks the last saved project. Writes use a temporary file, flush,
-fsync, and atomic replacement. The format rejects unknown keys, duplicate
+fsync, and atomic replacement. The format rejects credential-like script, scene and UI values, including known provider environment secrets. It rejects unknown keys, duplicate
 JSON keys, oversized data, nonfinite scene durations, linked paths and
 unvalidated selection or workflow payloads.
 
