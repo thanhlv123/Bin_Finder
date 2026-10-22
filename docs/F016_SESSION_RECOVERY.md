@@ -1,6 +1,7 @@
 # F016 — Session Persistence & Recovery
 
-Status: implementation in progress. The accepted seven-panel GUI remains unchanged.
+Status: acceptance complete pending final full regression/CI. Not yet PASS.
+The accepted seven-panel GUI remains unchanged.
 
 ## Phase 1: strict scene and UI snapshots
 
@@ -65,7 +66,49 @@ candidate approval, F012 acquisition authorization, final approval or READY.
 Users explicitly rerun F013 to prepare clips; the original F013 resume checks
 still apply. Re-splitting a script or changing project clears these references.
 
+## Phase 5: path limits and end-to-end acceptance
+
+Restore checks each media path with an explicit `lstat` instead of relying on
+`Path.is_file()`, which hides some errors as "missing". When a filesystem check
+fails with WinError 206 / `ENAMETOOLONG`, or fails for a Windows path at or over
+MAX_PATH (260 characters), the selection becomes unresolved with reason
+`local-media-path-too-long`. Paths are never truncated or shortened, the stored
+evidence keeps the original path, and media is never treated as valid when the
+check fails. F012's cache layout and acquisition contract are unchanged.
+
+`bin_finder.session_export_smoke` chains, offline with real FFmpeg and synthetic
+media in temporary storage outside the repository:
+
+restore session -> revalidate final selections (SHA-256) -> F014
+`build_final_project` -> F010 `evaluate_project` READY -> real F015 export.
+
+It reuses the F015 A–B–A fixture: readiness and manifest provenance stay in
+original source coordinates (10/0/30 s), while the materialized adapter uses
+local 0 → 5 s ranges. It then replaces one source after the session was saved
+and confirms that scene restores as `media-identity-changed`, READY is false and
+F015 returns `not_ready` without creating a library. The pytest
+`test_session_export_e2e_f016.py` runs the same chain plus a GUI restart that
+exports through the existing Panel 7 worker; it skips when FFmpeg is absent.
+
+```powershell
+$f016Tests = @(Get-ChildItem tests/test_*f016*.py | ForEach-Object { $_.FullName })
+.\.venv\Scripts\python.exe -m pytest -q $f016Tests --basetemp="..\pytest_tmp"
+.\.venv\Scripts\python.exe -m pytest -q --basetemp="..\pytest_tmp"
+$env:PYTHONPATH = "src"
+.\.venv\Scripts\python.exe -m bin_finder.session_export_smoke --approve-test-export
+git diff --check
+```
+
+On this development machine the default pytest temp directory is not writable,
+and deep `--basetemp` folders can exceed MAX_PATH for fixtures that create F012
+cache paths, so use the short basetemp above (a sibling of the repository checkout).
+
+Local acceptance (Windows 10, Python 3.12): F016 focused 41 passed, 2 skipped;
+full regression 404 passed, 3 skipped; F016 restore/export smoke PASS; F015
+smoke PASS. Skips are symlink-creation tests without Windows privilege.
+
 ## Remaining acceptance work
 
-- Run full Windows CI and security/artifact review before PR/merge.
-- Confirm restored READY-only F015 export on Windows.
+- Windows CI must pass on the pushed branch.
+- F016 becomes PASS only after full regression, the real restore/export smoke,
+  the security/artifact review and Windows CI all pass.

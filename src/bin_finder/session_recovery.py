@@ -5,6 +5,9 @@ The codec checks structure; this module checks on-disk source identity.
 """
 from __future__ import annotations
 
+import errno
+import os
+import stat
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -26,9 +29,35 @@ class RestoredSession:
     workflow_refs: tuple[dict[str, str], ...] = ()
 
 
+WINDOWS_MAX_PATH = 260
+ERROR_FILENAME_EXCED_RANGE = 206
+
+
+class _PathTooLong(OSError):
+    pass
+
+
+def _path_too_long(path, error=None):
+    """Classify a failed filesystem check; the path is never shortened."""
+    if error is not None and (getattr(error, "winerror", None) == ERROR_FILENAME_EXCED_RANGE
+                              or error.errno == errno.ENAMETOOLONG):
+        return True
+    # Without Windows long-path support an over-limit path cannot be checked.
+    return os.name == "nt" and len(str(path)) >= WINDOWS_MAX_PATH
+
+
 def _safe_regular_file(value):
     path = Path(value)
     if not path.is_absolute():
+        return None
+    # Explicit lstat: Path.is_file()/is_symlink() hide some errors as False.
+    try:
+        info = os.lstat(path)
+    except OSError as error:
+        if _path_too_long(path, error):
+            raise _PathTooLong(str(error)) from None
+        return None
+    if not stat.S_ISREG(info.st_mode) or info.st_size <= 0:
         return None
     # Reject symlinks and Windows junctions in the entire source path.
     for entry in (path, *path.parents):
@@ -73,7 +102,14 @@ def restore_session(payload) -> RestoredSession:
                 source_url="", source_metadata=row["source_metadata"],
             )
             selections.append(clip)
-        except (OSError, ValueError):
+        except _PathTooLong:
+            unresolved.append((scene_id, "local-media-path-too-long"))
+        except OSError as error:
+            reason = ("local-media-path-too-long"
+                      if _path_too_long(row["local_file"], error)
+                      else "local-media-unavailable")
+            unresolved.append((scene_id, reason))
+        except ValueError:
             unresolved.append((scene_id, "local-media-unavailable"))
     # Reuse F014's project scene/clip linkage checks, not a new approval path.
     project = build_final_project(snapshot["project_id"], scenes, selections, ".")
