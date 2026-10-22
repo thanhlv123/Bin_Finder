@@ -49,8 +49,21 @@ A newly split script or changed project discards old unresolved references.
 Corrupt/unsafe active snapshots are not overwritten by demo data on close.
 Each test uses isolated local application data to prevent cross-test sessions.
 
+## Phase 4: non-authoritative F013 workflow references
+
+Completed F013 analysis items now persist only scene/candidate/provider/source IDs,
+a workflow signature digest and a media SHA-256. References are accepted only
+from the current project's existing F013 workflow state file. On restart the
+state must still match, and its referenced local media must be regular,
+non-linked and SHA-256-identical. Stale references are discarded. No state
+paths, source URLs, candidate/provider payloads, acquired media, or workflow
+objects enter the session snapshot. The GUI can display the count of recovered
+historical references, but does not reconstruct runnable analysis results,
+candidate approval, F012 acquisition authorization, final approval or READY.
+Users explicitly rerun F013 to prepare clips; the original F013 resume checks
+still apply. Re-splitting a script or changing project clears these references.
+
 ## Remaining acceptance work
 
 - Add independent F012 authorization evidence for remote-origin selections.
-- Add minimal workflow reference persistence without storing provider data.
-- Run full Windows CI and security review before PR/merge.
+- Run full Windows CI and security/artifact review before PR/merge.

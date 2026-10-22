@@ -5,6 +5,7 @@ from PyQt6.QtCore import QTimer
 from bin_finder.session_codec import FORMAT, SessionError, scene_to_data, selection_to_data
 from bin_finder.session_recovery import restore_session
 from bin_finder.session_store import SessionStore, SessionStoreError
+from bin_finder.session_workflow import capture_workflow_refs
 
 
 class SessionLifecycle:
@@ -14,6 +15,7 @@ class SessionLifecycle:
         self.project_id = window.project_panel.project_name.text()
         self.failed = False
         self.unresolved_rows = []
+        self.workflow_refs = []
         self.timer = QTimer(window)
         self.timer.setSingleShot(True)
         self.timer.setInterval(600)
@@ -38,7 +40,7 @@ class SessionLifecycle:
                 "project_id": project_id if project_id is not None else w.project_panel.project_name.text(),
                 "scenes": [scene_to_data(scene) for scene in w.scenes],
                 "final_selections": [selection_to_data(clip) for clip in w.final_selections],
-                "workflow_refs": [],
+                "workflow_refs": list(self.workflow_refs),
                 "ui_state": {
                     "script_text": w.project_panel.script.toPlainText(),
                     "output_dir": w.export_panel.dest.text(),
@@ -77,6 +79,7 @@ class SessionLifecycle:
         self.unresolved_rows = [
             row for row in payload["final_selections"] if row["scene_id"] in unresolved_ids
         ]
+        self.workflow_refs = list(restored.workflow_refs)
         w._session_restoring = True
         try:
             w.project_panel.project_name.setText(restored.project_id)
@@ -104,6 +107,9 @@ class SessionLifecycle:
             if restored.unresolved:
                 w.workflow_status.setText(
                     f"Khôi phục: {len(restored.unresolved)} clip cần duyệt lại")
+            elif self.workflow_refs:
+                w.workflow_status.setText(
+                    f"Đã khôi phục {len(self.workflow_refs)} tham chiếu phân tích; cần chạy lại để duyệt cuối")
             else:
                 w.workflow_status.setText("Đã khôi phục phiên; kiểm tra trước khi xuất")
         finally:
@@ -117,12 +123,27 @@ class SessionLifecycle:
             self.save(project_id=self.project_id)
         self.project_id = self.window.project_panel.project_name.text()
         self.unresolved_rows = []
+        self.workflow_refs = []
         self.schedule()
         return True
 
     def invalidate_unresolved(self):
         # A newly split script is a different approval context even with reused IDs.
         self.unresolved_rows = []
+        self.workflow_refs = []
+
+    def record_workflow(self, result):
+        """Retain only F013 identity/hash references, never analysis objects."""
+        refs = capture_workflow_refs(self.window.project_panel.project_name.text(), result)
+        if not refs:
+            return
+        identities = {(r["scene_id"], r["candidate_id"], r["provider"], r["source_id"])
+                      for r in refs}
+        self.workflow_refs = [
+            r for r in self.workflow_refs
+            if (r["scene_id"], r["candidate_id"], r["provider"], r["source_id"]) not in identities
+        ] + list(refs)
+        self.schedule()
 
     def close(self):
         self.timer.stop()

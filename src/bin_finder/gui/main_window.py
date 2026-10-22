@@ -498,6 +498,7 @@ class MainWindow(QMainWindow):
             if current is not None and key == (current.scene_id, current.candidate_id,
                                                current.provider, current.source_id):
                 self.review_panel.set_candidate(item.candidate)
+        self._session_lifecycle.record_workflow(result)
         failed = next((item for item in result.items if item.stage != "analyzed"), None)
         self.workflow_status.setText(
             f"Chưa hoàn tất: {failed.message}" if failed else "Hoàn tất; cần kiểm tra và duyệt cuối")

@@ -12,6 +12,7 @@ from bin_finder.analysis.fingerprint import fingerprint_file
 from bin_finder.final_selection import build_final_project
 from bin_finder.models import SceneRecord, SelectedClipRecord
 from bin_finder.session_codec import scene_from_data, validate_snapshot
+from bin_finder.session_workflow import restore_workflow_refs
 
 
 @dataclass(frozen=True)
@@ -21,6 +22,7 @@ class RestoredSession:
     final_selections: tuple[SelectedClipRecord, ...]
     unresolved: tuple[tuple[str, str], ...]
     ui_state: dict[str, str]
+    workflow_refs: tuple[dict[str, str], ...] = ()
 
 
 def _safe_regular_file(value):
@@ -77,4 +79,5 @@ def restore_session(payload) -> RestoredSession:
     return RestoredSession(
         snapshot["project_id"], scenes, tuple(project.selected_clips),
         tuple(unresolved), dict(snapshot["ui_state"]),
+        restore_workflow_refs(snapshot["project_id"], snapshot["workflow_refs"]),
     )

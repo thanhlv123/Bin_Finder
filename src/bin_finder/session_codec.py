@@ -179,6 +179,31 @@ def selection_to_data(clip):
     return validate_selection_data(row)
 
 
+WORKFLOW_REF_FIELDS = (
+    "scene_id", "candidate_id", "provider", "source_id", "signature", "media_sha256",
+)
+
+
+def validate_workflow_ref(row):
+    """A reference to F013 state, never a review, approval or READY decision."""
+    if not isinstance(row, dict) or set(row) != set(WORKFLOW_REF_FIELDS):
+        raise SessionError("invalid-workflow-reference")
+    normalized = {
+        "scene_id": _snapshot_text(row["scene_id"], 128),
+        "candidate_id": _snapshot_text(row["candidate_id"], 256),
+        "provider": _snapshot_text(row["provider"], 128),
+        "source_id": _snapshot_text(row["source_id"], 512),
+        "signature": _snapshot_text(row["signature"], 64),
+        "media_sha256": _snapshot_text(row["media_sha256"], 64),
+    }
+    if (not all(normalized.values()) or
+            normalized["provider"] not in {"local", "pexels", "pixabay"} or
+            not re.fullmatch(r"[0-9a-f]{64}", normalized["signature"]) or
+            not re.fullmatch(r"[0-9a-f]{64}", normalized["media_sha256"])):
+        raise SessionError("invalid-workflow-reference")
+    return normalized
+
+
 def validate_snapshot(payload):
     if not isinstance(payload, dict) or set(payload) != {
             "format", "project_id", "scenes", "final_selections",
@@ -200,11 +225,17 @@ def validate_snapshot(payload):
                 item["scene_order"] != scene_orders[item["scene_id"]]
                 for item in selections)):
         raise SessionError("unvalidated-references")
-    if payload["workflow_refs"]:
-        raise SessionError("unvalidated-references")
+    if not isinstance(payload["workflow_refs"], list) or len(payload["workflow_refs"]) > 1000:
+        raise SessionError("invalid-workflow-reference")
+    refs = [validate_workflow_ref(row) for row in payload["workflow_refs"]]
+    ref_ids = [(r["scene_id"], r["candidate_id"], r["provider"], r["source_id"])
+               for r in refs]
+    if (len(set(ref_ids)) != len(ref_ids) or
+            any(r["scene_id"] not in scene_orders for r in refs)):
+        raise SessionError("invalid-workflow-reference")
     if not isinstance(payload["ui_state"], dict) or set(payload["ui_state"]) - {
             "script_text", "output_dir", "current_scene_id"}:
         raise SessionError("invalid-ui")
     return {"format": FORMAT, "project_id": _snapshot_text(payload["project_id"], 128),
-            "scenes": scenes, "final_selections": selections, "workflow_refs": [],
+            "scenes": scenes, "final_selections": selections, "workflow_refs": refs,
             "ui_state": {key: _snapshot_text(value) for key, value in payload["ui_state"].items()}}
