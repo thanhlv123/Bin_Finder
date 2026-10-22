@@ -94,18 +94,26 @@ jobs:
             Write-Output "::error title=pytest::F016 end-to-end export tests were skipped"
             exit 1
           }
+          if ($output -match '^SKIPPED.*test_handoff_export_f017') {
+            Write-Output "::error title=pytest::F017 real handoff test was skipped"
+            exit 1
+          }
           exit $code
 
       - name: Real FFmpeg export smokes
         shell: pwsh
         run: |
           $env:PYTHONPATH = "src"
-          foreach ($module in "bin_finder.final_export_smoke", "bin_finder.session_export_smoke") {
+          foreach ($module in "bin_finder.final_export_smoke", "bin_finder.session_export_smoke", "bin_finder.handoff_smoke") {
             $line = (python -m $module --approve-test-export | Select-Object -Last 1)
             $code = $LASTEXITCODE
             Write-Output $line
             Write-Output "::notice title=$($module)::exit $code | $line"
             if ($code) { exit $code }
+            if ($module -eq "bin_finder.handoff_smoke" -and $line -notmatch '^PASS_F017_REAL_HANDOFF') {
+              Write-Output "::error title=$($module)::F017 real handoff smoke did not report PASS"
+              exit 1
+            }
           }
 
       - name: GUI smoke
