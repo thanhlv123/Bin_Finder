@@ -13,6 +13,7 @@ class SessionLifecycle:
         self.store = SessionStore()
         self.project_id = window.project_panel.project_name.text()
         self.failed = False
+        self.unresolved_rows = []
         self.timer = QTimer(window)
         self.timer.setSingleShot(True)
         self.timer.setInterval(600)
@@ -44,6 +45,15 @@ class SessionLifecycle:
                     "current_scene_id": w._current_scene.scene_id,
                 },
             }
+            # Keep prior explicit-approval evidence for unresolved media without
+            # putting it back into the GUI's approved selection collection.
+            if payload["project_id"] == self.project_id:
+                selected = {row["scene_id"] for row in payload["final_selections"]}
+                scene_ids = {scene.scene_id for scene in w.scenes}
+                payload["final_selections"].extend(
+                    row for row in self.unresolved_rows
+                    if row["scene_id"] in scene_ids and row["scene_id"] not in selected
+                )
             self.store.save(payload)
             return True
         except (SessionError, SessionStoreError, OSError, TypeError, ValueError):
@@ -63,6 +73,10 @@ class SessionLifecycle:
             self.failed = True
             w.workflow_status.setText("Phiên không hợp lệ; không tự ghi đè")
             return
+        unresolved_ids = {scene_id for scene_id, _reason in restored.unresolved}
+        self.unresolved_rows = [
+            row for row in payload["final_selections"] if row["scene_id"] in unresolved_ids
+        ]
         w._session_restoring = True
         try:
             w.project_panel.project_name.setText(restored.project_id)
@@ -102,8 +116,13 @@ class SessionLifecycle:
         if self.project_id:
             self.save(project_id=self.project_id)
         self.project_id = self.window.project_panel.project_name.text()
+        self.unresolved_rows = []
         self.schedule()
         return True
+
+    def invalidate_unresolved(self):
+        # A newly split script is a different approval context even with reused IDs.
+        self.unresolved_rows = []
 
     def close(self):
         self.timer.stop()

@@ -43,6 +43,9 @@ Candidate review state and READY are never restored as approvals.
 Script, output-directory, scene and final-approval changes are saved with
 a short debounce. Closing flushes the session after active workers finish;
 project-name changes save the previous project before clearing its approvals.
+Unresolved selections remain stored as validated evidence (never as approved
+GUI state), so closing and restarting does not erase the user's earlier choice.
+A newly split script or changed project discards old unresolved references.
 Corrupt/unsafe active snapshots are not overwritten by demo data on close.
 Each test uses isolated local application data to prevent cross-test sessions.
 

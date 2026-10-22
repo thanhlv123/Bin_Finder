@@ -76,6 +76,14 @@ def test_gui_missing_media_never_restores_approval_or_ready(tmp_path, monkeypatc
     assert not second.export_panel.export.isEnabled()
     assert "cần duyệt lại" in second.workflow_status.text()
     close_window(second)
+    # Unavailable media is never approved, but its prior explicit choice
+    # survives a second restart so recovery can be retried later.
+    assert len(SessionStore(root).load_active()["final_selections"]) == 1
+    media.write_bytes(b"F016 local media fixture")
+    third = new_window(monkeypatch, root)
+    assert len(third.final_selections) == 1
+    assert third.final_selections[0].clip_id == clip.clip_id
+    close_window(third)
 
 
 def test_corrupt_session_not_overwritten_by_demo_on_close(tmp_path, monkeypatch):

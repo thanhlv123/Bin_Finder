@@ -617,6 +617,7 @@ class MainWindow(QMainWindow):
         chunks = [part.strip() for part in text.replace("\n", " ").split(".") if part.strip()]
         if not chunks:
             return
+        self._session_lifecycle.invalidate_unresolved()
         scenes = [
             SceneRecord(
                 scene_id=f"scene_{index:03d}",
