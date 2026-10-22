@@ -48,7 +48,7 @@ Legacy adapter v1 and F010/F014/F015/F016 semantics unchanged. See
 
 F018: Production script scene planning and context enrichment. **Implemented; local
 acceptance PASS, Windows CI pending**. Deterministic `scene_planning` replaces the GUI
-prototype split; raw scenes carry searchable context and a documented heuristic
+prototype split (3.5–7.0 s scenes aligned to one F006 clip each; long narration splits into more scenes); raw scenes carry searchable context and a documented heuristic
 verification fallback. F010 60–180 s policy untouched; F019 owns long-form acceptance.
 See [F018 contract](F018_PRODUCTION_SCENE_PLANNING.md).
 

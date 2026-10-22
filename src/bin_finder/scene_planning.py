@@ -24,17 +24,17 @@ class ScenePlanningError(ValueError):
 
 @dataclass(frozen=True)
 class ScenePlanningPolicy:
-    # Bounds mirror session persistence (script_text <= 50000 chars).
+    # Bounds mirror session persistence (script_text <= 50000 chars, <= 1000 scenes).
     max_input_chars: int = 50_000
-    max_scenes: int = 500
+    max_scenes: int = 1000  # session snapshots accept at most 1000 scenes
     # Sentences shorter than min_scene_words are grouped with neighbours (same paragraph)
     # while the group stays within max_scene_words; longer sentences are split.
     min_scene_words: int = 8
-    max_scene_words: int = 45
+    max_scene_words: int = 17
     # Duration estimate: words / words_per_second, clamped, rounded to 0.1 s.
     words_per_second: float = 2.5
     min_duration: float = 3.5
-    max_duration: float = 15.0
+    max_duration: float = 7.0  # F006 ClipPolicy.max_duration: one scene -> one final clip
 
     def validate(self) -> None:
         if self.max_input_chars < 1 or self.max_scenes < 1:
@@ -45,6 +45,8 @@ class ScenePlanningPolicy:
             raise ValueError("words_per_second must be positive")
         if not 0 < self.min_duration <= self.max_duration:
             raise ValueError("duration bounds must satisfy 0 < min <= max")
+        if self.max_scene_words / self.words_per_second > self.max_duration:
+            raise ValueError("max_scene_words would exceed max_duration at words_per_second")
 
 
 @dataclass(frozen=True)
@@ -271,11 +273,12 @@ def segment(script: str, policy: ScenePlanningPolicy | None = None) -> list[str]
     # A one-word remnant is never a scene of its own; fold it into a neighbour.
     merged: list[str] = []
     for text in texts:
-        if merged and _count(text) < 2 and _count(merged[-1]) + _count(text) <= policy.max_scene_words * 2:
+        if merged and _count(text) < 2 and _count(merged[-1]) + _count(text) <= policy.max_scene_words:
             merged[-1] = f"{merged[-1]} {text}"
         else:
             merged.append(text)
-    if len(merged) > 1 and _count(merged[0]) < 2:
+    if (len(merged) > 1 and _count(merged[0]) < 2
+            and _count(merged[0]) + _count(merged[1]) <= policy.max_scene_words):
         merged[1:2] = [f"{merged[0]} {merged[1]}"]
         del merged[0]
     if len(merged) > policy.max_scenes:

@@ -26,21 +26,27 @@ it is never executed or used as a path, nothing is logged or persisted by the pl
    stay attached). A `.` does not end a sentence after known abbreviations (Mr, Dr, U.S,
    etc., Vietnamese ông/bà/TS…), single-letter initials, or before a digit after "No".
    Decimals never split because a boundary needs trailing whitespace.
-4. Sentences with no letters/digits are dropped. Sentences over `max_scene_words` (45) are
+4. Sentences with no letters/digits are dropped. Sentences over `max_scene_words` (17) are
    split at clause marks (`, ; : — –`) and then at word boundaries.
 5. Within a paragraph, a group shorter than `min_scene_words` (8) absorbs following
    sentences while staying ≤ `max_scene_words`; a short tail merges backwards. A scene of
-   fewer than two words is folded into a neighbour.
+   fewer than two words is folded into a neighbour when the result stays within
+   `max_scene_words`.
 
 ### Bounds (fail safe)
-`max_input_chars=50000` (matches session `script_text`), `max_scenes=500`. Oversized input
+`max_input_chars=50000` and `max_scenes=1000` (both match session snapshot limits). Oversized input
 raises `ScenePlanningError("script-too-long" | "too-many-scenes" | "script-not-text")`;
 the GUI shows the code in the workflow status and keeps the previous scenes. Empty input
 yields no scenes and the GUI does nothing, as before.
 
 ### Duration estimate
-`target_duration = clamp(words / 2.5, 3.5, 15.0)` rounded to 0.1 s (`words_per_second`,
-`min_duration`, `max_duration` in `ScenePlanningPolicy`). This is a per-scene narration
+`target_duration = clamp(words / 2.5, 3.5, 7.0)` rounded to 0.1 s (`words_per_second`,
+`min_duration`, `max_duration` in `ScenePlanningPolicy`). The defaults equal F006's
+`ClipPolicy` (3.5–7.0 s) so **one planned scene maps to one final F006 clip**. Long
+narration is therefore split into additional scenes (`max_scene_words=17`, i.e. at most
+6.8 s at 2.5 words/s) instead of producing a scene whose duration exceeds the clip
+maximum. `ScenePlanningPolicy.validate()` rejects any custom policy where
+`max_scene_words / words_per_second > max_duration`. This is a per-scene narration
 estimate only. **F010's 60–180 s acceptance policy is unchanged**; project-level
 long-form acceptance is F019.
 

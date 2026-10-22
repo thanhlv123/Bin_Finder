@@ -1,6 +1,7 @@
 """F018 GUI: the existing split action runs the production planner and keeps lifecycle semantics."""
 from PyQt6.QtWidgets import QApplication
 
+from bin_finder.clips.models import ClipPolicy
 from bin_finder.demo_data import demo_scenes
 from bin_finder.gui.main_window import MainWindow
 from bin_finder.search.query_builder import build_scene_queries
@@ -79,5 +80,19 @@ def test_identical_script_replans_identically(monkeypatch):
         first = list(window.scenes)
         window.project_panel.split_requested.emit(SCRIPT)
         assert window.scenes == first
+    finally:
+        window.close()
+
+
+def test_gui_split_of_long_narration_stays_within_clip_policy(monkeypatch):
+    from test_scene_planning_f018 import LONG_NARRATION
+    window, searched = window_with_search_log(monkeypatch)
+    try:
+        window.project_panel.split_requested.emit(LONG_NARRATION)
+        assert len(window.scenes) >= 4
+        assert all(ClipPolicy().min_duration <= s.target_duration <= ClipPolicy().max_duration
+                   for s in window.scenes)
+        assert all(s.context.keywords for s in window.scenes)
+        assert searched and all(item is window.scenes[0] for item in searched)
     finally:
         window.close()
