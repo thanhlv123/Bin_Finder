@@ -39,9 +39,27 @@ jobs:
         shell: pwsh
         run: python -m compileall -q src run_bin_finder.py
 
+      - name: FFmpeg diagnostic
+        shell: pwsh
+        run: |
+          $ffmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue
+          if ($ffmpeg) {
+            ffmpeg -version
+            $version = (ffmpeg -version | Select-Object -First 1)
+            Write-Output "::notice title=FFmpeg::found $($ffmpeg.Source) | $version"
+          } else {
+            Write-Output "::notice title=FFmpeg::not found on PATH"
+          }
+
       - name: Unit tests
         shell: pwsh
-        run: python -m pytest -q
+        run: |
+          python -m pytest -q -rs | Tee-Object -FilePath "$env:RUNNER_TEMP\pytest.txt"
+          $code = $LASTEXITCODE
+          Get-Content "$env:RUNNER_TEMP\pytest.txt" |
+            Where-Object { $_ -match '^SKIPPED|(passed|failed|error)' } |
+            ForEach-Object { Write-Output "::notice title=pytest::$_" }
+          exit $code
 
       - name: GUI smoke
         shell: pwsh
