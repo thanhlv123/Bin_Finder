@@ -52,6 +52,11 @@ prototype split (3.5–7.0 s scenes aligned to one F006 clip each; long narratio
 verification fallback. F010 60–180 s policy untouched; F019 owns long-form acceptance.
 See [F018 contract](F018_PRODUCTION_SCENE_PLANNING.md).
 
+F019: Production long-form acceptance policy. **Implemented; local acceptance PASS,
+Windows CI pending**. F010 default stays 60–180 s; GUI readiness and F015 export use
+`production_acceptance_policy()` (min 60 s, no upper ceiling). Other gates, F014, F006,
+F017 schemas unchanged. See [F019 contract](F019_LONG_FORM_ACCEPTANCE.md).
+
 ## Architecture principles learned from public footage-search projects
 
 Bin Finder follows a clean-room design inspired by common retrieval patterns:

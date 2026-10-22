@@ -11,7 +11,7 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 
-from bin_finder.acceptance import AcceptanceReport, evaluate_project
+from bin_finder.acceptance import AcceptanceReport, evaluate_project, production_acceptance_policy
 from bin_finder.acquisition.service import _provenance, _safe_text
 from bin_finder.analysis.fingerprint import fingerprint_file
 from bin_finder.analysis.probe import FFprobeMediaProbe
@@ -139,7 +139,8 @@ class FinalExportService:
                progress=None, cancelled=None):
         options = options or ExportOptions()
         project = build_final_project(project_id, scenes, selections, destination)
-        report = evaluate_project(project)
+        # F019: same production policy as the GUI readiness check (no 180 s ceiling).
+        report = evaluate_project(project, production_acceptance_policy())
         if not report.ready:
             return FinalExportResult("not_ready", report)
         stage = None

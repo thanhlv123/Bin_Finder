@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 import bin_finder.final_export as core
-from bin_finder.acceptance import evaluate_project
+from bin_finder.acceptance import evaluate_project, production_acceptance_policy
 from bin_finder.analysis.fingerprint import fingerprint_file
 from bin_finder.clips.extractor import FfmpegClipExtractor
 from bin_finder.clips.models import ExtractionResult
@@ -75,9 +75,10 @@ def test_aba_uses_original_report_once_and_materializes_adapter(fixture_export, 
     original = build_final_project("test", f.scenes, f.clips, f.destination)
     assert evaluate_project(original).ready
     reports = []
-    def evaluate(project):
+    def evaluate(project, policy=None):
         assert [c.start for c in project.selected_clips] == [10, 0, 30]
-        report = evaluate_project(project)
+        assert policy == production_acceptance_policy()
+        report = evaluate_project(project, policy)
         reports.append(report)
         return report
     monkeypatch.setattr(core, "evaluate_project", evaluate)

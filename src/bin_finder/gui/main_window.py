@@ -38,7 +38,7 @@ from bin_finder.final_export import ExportOptions
 from bin_finder.scene_planning import ScenePlanner, ScenePlanningError
 from bin_finder.gui.final_export_worker import FinalExportWorker
 from bin_finder.gui.session_lifecycle import SessionLifecycle
-from bin_finder.acceptance import evaluate_project
+from bin_finder.acceptance import evaluate_project, production_acceptance_policy
 from bin_finder.workflow import WorkflowRequest, WorkflowService
 from bin_finder.acquisition import AcquisitionRequest, AcquisitionService
 from bin_finder.gui.theme import APP_STYLE
@@ -728,7 +728,7 @@ class MainWindow(QMainWindow):
     def _refresh_acceptance(self, *_):
         project = build_final_project(self.project_panel.project_name.text(), self.scenes,
                                       self.final_selections, self.export_panel.dest.text())
-        self.acceptance_report = evaluate_project(project)
+        self.acceptance_report = evaluate_project(project, production_acceptance_policy())
         r = self.acceptance_report
         reasons = []
         if r.unresolved_scene_ids:
