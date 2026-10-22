@@ -18,6 +18,7 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 - **F015 final footage export library:** PASS (offline + real FFmpeg smoke)
 - **F016 session persistence / recovery:** PASS (Windows CI 407 passed, 0 skipped + real FFmpeg restore/export smoke)
 - **F017 stable handoff contract / portable package:** PASS (Windows CI + real FFmpeg handoff acceptance: run #157, 471 passed, 0 skipped)
+- **F020 portable handoff GUI:** implemented, local acceptance PASS (Windows CI pending)
 - **F019 long-form acceptance policy:** implemented, local acceptance PASS (Windows CI pending)
 - **F018 production scene planning / context enrichment:** implemented, local acceptance PASS (Windows CI pending)
 
@@ -173,5 +174,12 @@ F019 long-form acceptance: F010's default (`evaluate_project(project)`) still me
 coverage, score, rotation and overlap gates unchanged. Structural bounds (F018 input
 and scene limits, session limits) still apply. See
 [F019 details](docs/F019_LONG_FORM_ACCEPTANCE.md).
+
+F020 portable handoff GUI: Panel 7 has a "Tạo gói handoff portable" checkbox, checked by
+default, which makes a normal GUI export write `_bin_finder_handoff.json`
+(`bin_finder_handoff_v1`). The core `ExportOptions().handoff` stays `False`, and the legacy
+`ai_video_editor_bin_finder_adapter_v1` option remains separate and independent.
+AI_Video_Editor consumer integration is not implemented. See
+[F020 details](docs/F020_PORTABLE_HANDOFF_GUI.md).
 
 See `docs/ROADMAP.md` for the milestone plan.
