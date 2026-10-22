@@ -1,6 +1,6 @@
 # F016 — Session Persistence & Recovery
 
-Status: acceptance complete pending final full regression/CI. Not yet PASS.
+Status: **PASS**.
 The accepted seven-panel GUI remains unchanged.
 
 ## Phase 1: strict scene and UI snapshots
@@ -107,8 +107,24 @@ Local acceptance (Windows 10, Python 3.12): F016 focused 41 passed, 2 skipped;
 full regression 404 passed, 3 skipped; F016 restore/export smoke PASS; F015
 smoke PASS. Skips are symlink-creation tests without Windows privilege.
 
-## Remaining acceptance work
+## Acceptance
 
-- Windows CI must pass on the pushed branch.
-- F016 becomes PASS only after full regression, the real restore/export smoke,
-  the security/artifact review and Windows CI all pass.
+F016 is **PASS**. Verified acceptance:
+
+- Windows CI (`windows-latest`, Python 3.12): **407 passed, 0 skipped, 0 failed**,
+  including both `test_session_export_e2e_f016.py` tests (the workflow fails if
+  they are skipped) and the symlink-refusal tests.
+- CI installs the fixed Gyan FFmpeg 9.0.2 Windows essentials build as a CI test
+  tool only and verifies its hardcoded SHA-256 before use. It is not an
+  application runtime dependency.
+- Real F015 FFmpeg smoke: `PASS_F015_REAL_FFMPEG`.
+- Real F016 smoke: `PASS_F016_RESTORE_EXPORT` (restore -> SHA-256 revalidation
+  -> F010 READY -> F015 export; tampered source unresolved / `not_ready`).
+- MAX_PATH / WinError 206 restore fails closed as `local-media-path-too-long`.
+- Remote F012 cache provenance is revalidated before a remote selection restores.
+- F013 workflow references restore as non-authoritative hints only.
+- The GUI lifecycle restores validated state only.
+- READY is never persisted; F010/F015 readiness is always recomputed.
+- Security/artifact review: no credentials, signed URL queries, raw provider
+  responses, developer-machine paths, media, manifests, caches, databases, logs
+  or binaries in the change set. F010/F014/F015 contracts are unchanged.

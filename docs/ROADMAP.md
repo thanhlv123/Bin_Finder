@@ -29,8 +29,10 @@ A–B–A passes without changing F010 overlap semantics or adapter v1. Acceptan
 real offline FFmpeg A–B–A smoke passed. See
 [F015 contract](F015_FINAL_FOOTAGE_EXPORT.md).
 
-F016: Versioned session persistence and recovery. **ACCEPTANCE COMPLETE — PENDING FINAL FULL REGRESSION/CI** (not yet PASS). Scene/UI snapshots and allowlisted final-selection serialization with local SHA-256 revalidation are implemented; remote F012 cache proof is implemented; MAX_PATH paths fail closed; offline real-FFmpeg
-restore -> READY -> F015 export smoke passes locally. PASS requires Windows CI.
+F016: Versioned session persistence and recovery. **PASS (Windows CI + real FFmpeg smokes)**. Scene/UI snapshots and allowlisted final-selection serialization with local SHA-256 revalidation are implemented; remote F012 cache proof is implemented; MAX_PATH paths fail closed; offline real-FFmpeg
+restore -> SHA-256 revalidation -> F010 READY -> F015 export smoke passes. READY is never
+persisted and is always recomputed. Acceptance: Windows CI 407 passed, 0 skipped (pinned
+FFmpeg 9.0.2, SHA-256 verified); real F015 and F016 restore/export smokes PASS.
 Validated F013 workflow identity/hash references are historical hints only,
 not restored approvals.
 GUI lifecycle restores validated state and recomputes F010/F015 readiness. See [F016 contract](F016_SESSION_RECOVERY.md).
