@@ -39,16 +39,46 @@ jobs:
         shell: pwsh
         run: python -m compileall -q src run_bin_finder.py
 
+      # CI test tool only: not a Python/runtime dependency of the application.
+      - name: Install pinned FFmpeg (CI test tool)
+        shell: pwsh
+        env:
+          FFMPEG_VERSION: "9.0.2"
+          FFMPEG_URL: https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip
+          FFMPEG_SHA256: 60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba
+        run: |
+          $zip = Join-Path $env:RUNNER_TEMP "ffmpeg-$env:FFMPEG_VERSION-essentials_build.zip"
+          Invoke-WebRequest -Uri $env:FFMPEG_URL -OutFile $zip
+          $actual = (Get-FileHash -Algorithm SHA256 -LiteralPath $zip).Hash.ToLowerInvariant()
+          Write-Output "::notice title=FFmpeg SHA-256::expected $env:FFMPEG_SHA256 | actual $actual"
+          if ($actual -cne $env:FFMPEG_SHA256) {
+            Write-Output "::error title=FFmpeg SHA-256::checksum mismatch"
+            exit 1
+          }
+          $root = Join-Path $env:RUNNER_TEMP "ffmpeg"
+          Expand-Archive -LiteralPath $zip -DestinationPath $root
+          $bin = Join-Path $root "ffmpeg-$env:FFMPEG_VERSION-essentials_build\bin"
+          foreach ($tool in "ffmpeg.exe", "ffprobe.exe") {
+            if (-not (Test-Path -LiteralPath (Join-Path $bin $tool) -PathType Leaf)) {
+              Write-Output "::error title=FFmpeg::$tool missing from archive"
+              exit 1
+            }
+          }
+          Add-Content -LiteralPath $env:GITHUB_PATH -Value $bin
+
       - name: FFmpeg diagnostic
         shell: pwsh
         run: |
-          $ffmpeg = Get-Command ffmpeg -ErrorAction SilentlyContinue
-          if ($ffmpeg) {
-            ffmpeg -version
-            $version = (ffmpeg -version | Select-Object -First 1)
-            Write-Output "::notice title=FFmpeg::found $($ffmpeg.Source) | $version"
-          } else {
-            Write-Output "::notice title=FFmpeg::not found on PATH"
+          foreach ($tool in "ffmpeg", "ffprobe") {
+            $command = Get-Command $tool -ErrorAction SilentlyContinue
+            if (-not $command) {
+              Write-Output "::error title=FFmpeg::$tool not found on PATH"
+              exit 1
+            }
+            & $tool -version
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+            $version = (& $tool -version | Select-Object -First 1)
+            Write-Output "::notice title=FFmpeg::$($command.Source) | $version"
           }
 
       - name: Unit tests
@@ -56,10 +86,27 @@ jobs:
         run: |
           python -m pytest -q -rs | Tee-Object -FilePath "$env:RUNNER_TEMP\pytest.txt"
           $code = $LASTEXITCODE
-          Get-Content "$env:RUNNER_TEMP\pytest.txt" |
+          $output = Get-Content "$env:RUNNER_TEMP\pytest.txt"
+          $output |
             Where-Object { $_ -match '^SKIPPED|(passed|failed|error)' } |
             ForEach-Object { Write-Output "::notice title=pytest::$_" }
+          if ($output -match '^SKIPPED.*test_session_export_e2e_f016') {
+            Write-Output "::error title=pytest::F016 end-to-end export tests were skipped"
+            exit 1
+          }
           exit $code
+
+      - name: Real FFmpeg export smokes
+        shell: pwsh
+        run: |
+          $env:PYTHONPATH = "src"
+          foreach ($module in "bin_finder.final_export_smoke", "bin_finder.session_export_smoke") {
+            $line = (python -m $module --approve-test-export | Select-Object -Last 1)
+            $code = $LASTEXITCODE
+            Write-Output $line
+            Write-Output "::notice title=$($module)::exit $code | $line"
+            if ($code) { exit $code }
+          }
 
       - name: GUI smoke
         shell: pwsh
