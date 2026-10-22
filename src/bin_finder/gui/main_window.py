@@ -35,6 +35,7 @@ from bin_finder.gui.workflow_worker import WorkflowWorker
 from bin_finder.gui.final_review_worker import FinalReviewWorker
 from bin_finder.final_selection import build_final_project
 from bin_finder.final_export import ExportOptions
+from bin_finder.scene_planning import ScenePlanner, ScenePlanningError
 from bin_finder.gui.final_export_worker import FinalExportWorker
 from bin_finder.gui.session_lifecycle import SessionLifecycle
 from bin_finder.acceptance import evaluate_project
@@ -207,7 +208,7 @@ class MainWindow(QMainWindow):
         self.review_panel.reject_candidate.connect(self._candidate_rejected)
         self.review_panel.compare_candidate.connect(self._candidate_compared)
         self.project_panel.output_dir.textChanged.connect(self.export_panel.dest.setText)
-        self.project_panel.split_requested.connect(self._prototype_split)
+        self.project_panel.split_requested.connect(self._split_script)
 
         for button in self.search_panel.findChildren(QPushButton):
             if "Tìm kiếm lại" in button.text():
@@ -614,20 +615,15 @@ class MainWindow(QMainWindow):
         self._ab_anchor = None
         self.review_panel.set_comparison_pending(False)
 
-    def _prototype_split(self, text: str):
-        chunks = [part.strip() for part in text.replace("\n", " ").split(".") if part.strip()]
-        if not chunks:
+    def _split_script(self, text: str):
+        try:
+            scenes = list(ScenePlanner().plan(text).scenes)
+        except ScenePlanningError as error:
+            self.workflow_status.setText(f"Không thể chia cảnh: {error.code}")
+            return
+        if not scenes:
             return
         self._session_lifecycle.invalidate_unresolved()
-        scenes = [
-            SceneRecord(
-                scene_id=f"scene_{index:03d}",
-                order=index,
-                english_text=chunk + ".",
-                target_duration=5.0,
-            )
-            for index, chunk in enumerate(chunks, start=1)
-        ]
         self.scenes = scenes
         self.final_selections = ()
         self.workflow_results.clear()

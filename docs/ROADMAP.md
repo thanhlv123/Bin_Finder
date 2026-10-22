@@ -46,6 +46,12 @@ paths, read-only `verify_handoff_package()`, real FFmpeg move/tamper/missing smo
 Legacy adapter v1 and F010/F014/F015/F016 semantics unchanged. See
 [F017 contract](F017_STABLE_HANDOFF_CONTRACT.md).
 
+F018: Production script scene planning and context enrichment. **Implemented; local
+acceptance PASS, Windows CI pending**. Deterministic `scene_planning` replaces the GUI
+prototype split; raw scenes carry searchable context and a documented heuristic
+verification fallback. F010 60–180 s policy untouched; F019 owns long-form acceptance.
+See [F018 contract](F018_PRODUCTION_SCENE_PLANNING.md).
+
 ## Architecture principles learned from public footage-search projects
 
 Bin Finder follows a clean-room design inspired by common retrieval patterns:
