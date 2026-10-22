@@ -160,7 +160,10 @@ The skip is the Windows symlink creation test when privilege/Developer Mode is
 unavailable. The real smoke includes the original-coordinate A–B–A / local-coordinate
 adapter regression and removes its temporary media and export library.
 
-Limitations: selections remain session-only as in F014; hashing assumes
+Limitations: F015 itself stores no selections. F016 persists explicit F014 final
+selections as evidence only; after a restart they are SHA-256 revalidated and F010
+readiness is recomputed before this READY-only export is enabled (READY is never
+persisted). See [F016](F016_SESSION_RECOVERY.md). Hashing assumes
 application-controlled storage and cannot defeat a hostile filesystem race.
 Cancellation cannot interrupt the current bounded FFmpeg extraction. No project
 rendering, provider acquisition, export resume, overwrite/version UI, VPS or

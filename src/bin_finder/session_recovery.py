@@ -1,0 +1,120 @@
+"""F016 fail-closed restoration of explicitly approved local media.
+
+Never use the stored selection list directly as authoritative GUI or export state.
+The codec checks structure; this module checks on-disk source identity.
+"""
+from __future__ import annotations
+
+import errno
+import os
+import stat
+from dataclasses import dataclass
+from pathlib import Path
+
+from bin_finder.analysis.fingerprint import fingerprint_file
+from bin_finder.final_selection import build_final_project
+from bin_finder.models import SceneRecord, SelectedClipRecord
+from bin_finder.session_codec import scene_from_data, validate_snapshot
+from bin_finder.session_workflow import restore_workflow_refs
+from bin_finder.session_remote import verified_remote_session_media
+
+
+@dataclass(frozen=True)
+class RestoredSession:
+    project_id: str
+    scenes: tuple[SceneRecord, ...]
+    final_selections: tuple[SelectedClipRecord, ...]
+    unresolved: tuple[tuple[str, str], ...]
+    ui_state: dict[str, str]
+    workflow_refs: tuple[dict[str, str], ...] = ()
+
+
+WINDOWS_MAX_PATH = 260
+ERROR_FILENAME_EXCED_RANGE = 206
+
+
+class _PathTooLong(OSError):
+    pass
+
+
+def _path_too_long(path, error=None):
+    """Classify a failed filesystem check; the path is never shortened."""
+    if error is not None and (getattr(error, "winerror", None) == ERROR_FILENAME_EXCED_RANGE
+                              or error.errno == errno.ENAMETOOLONG):
+        return True
+    # Without Windows long-path support an over-limit path cannot be checked.
+    return os.name == "nt" and len(str(path)) >= WINDOWS_MAX_PATH
+
+
+def _safe_regular_file(value):
+    path = Path(value)
+    if not path.is_absolute():
+        return None
+    # Explicit lstat: Path.is_file()/is_symlink() hide some errors as False.
+    try:
+        info = os.lstat(path)
+    except OSError as error:
+        if _path_too_long(path, error):
+            raise _PathTooLong(str(error)) from None
+        return None
+    if not stat.S_ISREG(info.st_mode) or info.st_size <= 0:
+        return None
+    # Reject symlinks and Windows junctions in the entire source path.
+    for entry in (path, *path.parents):
+        if entry.is_symlink() or getattr(entry, "is_junction", lambda: False)():
+            return None
+    if not path.is_file() or path.stat().st_size <= 0:
+        return None
+    return path
+
+
+def restore_session(payload) -> RestoredSession:
+    """Return only revalidated final selections; stale scenes stay unresolved.
+
+    Remote-origin selections require independently validated F012 cache provenance
+    in addition to their original explicit F014 final approval.
+    """
+    snapshot = validate_snapshot(payload)
+    scenes = tuple(scene_from_data(item) for item in snapshot["scenes"])
+    selections = []
+    unresolved = []
+    for row in snapshot["final_selections"]:
+        scene_id = row["scene_id"]
+        try:
+            path = _safe_regular_file(row["local_file"])
+            if path is None:
+                unresolved.append((scene_id, "local-media-unavailable"))
+                continue
+            if fingerprint_file(path).sha256 != row["source_metadata"]["media_sha256"]:
+                unresolved.append((scene_id, "media-identity-changed"))
+                continue
+            if row["provider"] != "local" and not verified_remote_session_media(row, path):
+                unresolved.append((scene_id, "remote-provenance-required"))
+                continue
+            clip = SelectedClipRecord(
+                clip_id=row["clip_id"], scene_id=scene_id,
+                scene_order=row["scene_order"], provider=row["provider"],
+                source_id=row["source_id"], title=row["title"],
+                local_file=str(path), start=row["start"], end=row["end"],
+                duration=row["duration"], semantic_score=row["semantic_score"],
+                vlm_score=row["vlm_score"], final_score=row["final_score"],
+                rights_status=row["rights_status"], creator=row["creator"],
+                source_url="", source_metadata=row["source_metadata"],
+            )
+            selections.append(clip)
+        except _PathTooLong:
+            unresolved.append((scene_id, "local-media-path-too-long"))
+        except OSError as error:
+            reason = ("local-media-path-too-long"
+                      if _path_too_long(row["local_file"], error)
+                      else "local-media-unavailable")
+            unresolved.append((scene_id, reason))
+        except ValueError:
+            unresolved.append((scene_id, "local-media-unavailable"))
+    # Reuse F014's project scene/clip linkage checks, not a new approval path.
+    project = build_final_project(snapshot["project_id"], scenes, selections, ".")
+    return RestoredSession(
+        snapshot["project_id"], scenes, tuple(project.selected_clips),
+        tuple(unresolved), dict(snapshot["ui_state"]),
+        restore_workflow_refs(snapshot["project_id"], snapshot["workflow_refs"]),
+    )
