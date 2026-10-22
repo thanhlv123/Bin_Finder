@@ -4,6 +4,7 @@ from typing import Protocol, Sequence
 
 from bin_finder.models import SceneRecord
 from bin_finder.retrieval.models import RetrievalUnit
+from bin_finder.scene_planning import content_words
 from bin_finder.verification.models import (
     VerificationDimensions,
     VerificationResult,
@@ -62,6 +63,13 @@ class HeuristicContextVerifier:
             location = _phrase_coverage(scene.context.location, text)
             objects = _phrase_coverage(scene.context.objects, text)
             conflict = _phrase_coverage(scene.context.avoid, text)
+            fallback = False
+            if all(value is None for value in (subject, action, location, objects)):
+                # F018: no structured context. Score scene-text keyword coverage instead of
+                # leaving the unit unscorable; reported through object_match, nothing invented.
+                objects = _phrase_coverage(
+                    tuple(content_words(scene.english_text, 8)), text)
+                fallback = objects is not None
             available = [
                 value
                 for value in (subject, action, location, objects)
@@ -84,7 +92,11 @@ class HeuristicContextVerifier:
                         context_conflict=conflict,
                     ),
                     confidence=round(confidence, 6),
-                    explanation="Fallback verification from transcript/metadata only.",
+                    explanation=(
+                        "Keyword fallback from scene text; transcript/metadata only."
+                        if fallback
+                        else "Fallback verification from transcript/metadata only."
+                    ),
                 )
             )
         return results

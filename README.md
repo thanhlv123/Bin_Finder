@@ -18,6 +18,7 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 - **F015 final footage export library:** PASS (offline + real FFmpeg smoke)
 - **F016 session persistence / recovery:** PASS (Windows CI 407 passed, 0 skipped + real FFmpeg restore/export smoke)
 - **F017 stable handoff contract / portable package:** PASS (Windows CI + real FFmpeg handoff acceptance: run #157, 471 passed, 0 skipped)
+- **F018 production scene planning / context enrichment:** implemented, local acceptance PASS (Windows CI pending)
 
 Candidate approval for acquisition/analysis is separate from final clip approval.
 Only explicitly approved, verified local clip proposals create final selections
@@ -157,5 +158,12 @@ contracts coexist, and neither schema changed:
 Bin Finder ends at an approved, verified, portable footage package. AI_Video_Editor
 integration is not done: it later starts at validated import of the handoff. See
 [F017 details](docs/F017_STABLE_HANDOFF_CONTRACT.md).
+
+F018 scene planning: the script-splitting action now uses the deterministic
+`bin_finder.scene_planning` planner (paragraphs, `. ! ?`, abbreviation/decimal safety,
+bounded grouping, 3.5–7.0 s duration estimate (one scene = one F006 clip; long narration becomes more scenes), conservative text-derived context with a
+keyword fallback) instead of the prototype period split. No LLM/VLM, no new dependency;
+F010 acceptance and F014 explicit approval are unchanged. See
+[F018 details](docs/F018_PRODUCTION_SCENE_PLANNING.md).
 
 See `docs/ROADMAP.md` for the milestone plan.
