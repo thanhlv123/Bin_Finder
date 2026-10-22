@@ -37,6 +37,13 @@ Validated F013 workflow identity/hash references are historical hints only,
 not restored approvals.
 GUI lifecycle restores validated state and recomputes F010/F015 readiness. See [F016 contract](F016_SESSION_RECOVERY.md).
 
+F017: Stable handoff contract and portable footage package. **Implemented; local
+acceptance PASS, Windows CI pending**. Opt-in `_bin_finder_handoff.json`
+(`bin_finder_handoff_v1`) built inside the F015 staging transaction, package-relative
+paths, read-only `verify_handoff_package()`, real FFmpeg move/tamper/missing smoke.
+Legacy adapter v1 and F010/F014/F015/F016 semantics unchanged. See
+[F017 contract](F017_STABLE_HANDOFF_CONTRACT.md).
+
 ## Architecture principles learned from public footage-search projects
 
 Bin Finder follows a clean-room design inspired by common retrieval patterns:

@@ -18,6 +18,7 @@ from bin_finder.analysis.probe import FFprobeMediaProbe
 from bin_finder.clips.extractor import FfmpegClipExtractor
 from bin_finder.clips.models import ClipPolicy, ClipProposal
 from bin_finder.final_selection import build_final_project
+from bin_finder.handoff import HANDOFF_FILENAME, build_handoff, verify_handoff_package
 from bin_finder.integration_adapter import write_integration_package
 from bin_finder.models import CandidateRecord, FootageProject
 
@@ -30,6 +31,7 @@ class ExportOptions:
     integration_adapter: bool = False
     scene_id_filenames: bool = True
     include_metadata: bool = True
+    handoff: bool = False  # F017 portable _bin_finder_handoff.json, built inside staging
 
 
 @dataclass(frozen=True)
@@ -50,6 +52,7 @@ class FinalExportResult:
     exported_count: int = 0
     total_duration: float = 0.0
     error: str = ""
+    handoff_path: Path | None = None
 
 
 class _Cancelled(Exception):
@@ -253,6 +256,14 @@ class FinalExportService:
                 final_project = FootageProject(project.project_id, root, project.scenes, materialized)
                 _validate_materialized(project, report, final_project, stage)
                 adapters = write_integration_package(stage, final_project, report)
+            if options.handoff:
+                ordered = sorted(project.scenes, key=lambda s: (s.order, s.scene_id))
+                build_handoff(project_id, ordered, rows, stage,
+                              include_metadata=options.include_metadata)
+                try:
+                    verify_handoff_package(stage)  # the producer must satisfy its own verifier
+                except Exception:
+                    raise ValueError("handoff-invalid") from None
             checkpoint()
             if root.exists():
                 root.rmdir()  # only an empty directory; a concurrent writer makes this fail
@@ -261,7 +272,8 @@ class FinalExportService:
             return FinalExportResult("success", report,
                 tuple(root / "footage" / name for name in names), root / "footage_manifest.json",
                 root / "footage_index.csv" if options.csv_index else None,
-                tuple(root / p.name for p in adapters), len(rows), payload["total_duration"])
+                tuple(root / p.name for p in adapters), len(rows), payload["total_duration"],
+                handoff_path=root / HANDOFF_FILENAME if options.handoff else None)
         except _Cancelled:
             return FinalExportResult("cancelled", report)
         except Exception as error:

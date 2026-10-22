@@ -17,6 +17,7 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 - **F014 workflow review / explicit final clip selection:** PASS (offline)
 - **F015 final footage export library:** PASS (offline + real FFmpeg smoke)
 - **F016 session persistence / recovery:** PASS (Windows CI 407 passed, 0 skipped + real FFmpeg restore/export smoke)
+- **F017 stable handoff contract / portable package:** implemented, local acceptance PASS (Windows CI pending)
 
 Candidate approval for acquisition/analysis is separate from final clip approval.
 Only explicitly approved, verified local clip proposals create final selections
@@ -141,5 +142,12 @@ WinError 206) fail closed as unresolved, and an offline real-FFmpeg smoke
 (`bin_finder.session_export_smoke`) chains restore -> SHA-256 revalidation -> F010 READY ->
 real F015 export. READY is never persisted; it is always recomputed. See
 [F016 details](docs/F016_SESSION_RECOVERY.md).
+
+F017 stable handoff: an F015 export can additionally write `_bin_finder_handoff.json`
+(`bin_finder_handoff_v1`) with package-relative paths, hashes and byte counts, and
+`verify_handoff_package()` checks it read-only after the folder is moved. Bin Finder
+ends at an approved, verified, portable footage package; AI_Video_Editor later starts
+at validated import. Legacy adapter v1 is unchanged. See
+[F017 details](docs/F017_STABLE_HANDOFF_CONTRACT.md).
 
 See `docs/ROADMAP.md` for the milestone plan.
