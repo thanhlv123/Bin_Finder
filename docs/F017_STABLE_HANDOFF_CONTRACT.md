@@ -1,6 +1,12 @@
 # F017 — Stable Handoff Contract & Portable Footage Package
 
-Status: **implemented; local acceptance PASS; Windows CI pending until pushed.**
+Status: **PASS (Windows CI + real FFmpeg handoff acceptance).**
+
+Verified acceptance: Windows CI run #157, run ID 39816530610, status SUCCESS;
+471 passed, 0 skipped, 0 failed; pinned FFmpeg 9.0.2 with SHA-256 verified; real
+smokes `PASS_F015_REAL_FFMPEG`, `PASS_F016_RESTORE_EXPORT`, `PASS_F017_REAL_HANDOFF`.
+This is not AI_Video_Editor integration: F017 ends at the portable verified footage
+package.
 
 Bin Finder ends at an **approved + verified + portable footage package**.
 AI_Video_Editor later begins at **validated import of `bin_finder_handoff_v1`**.
@@ -12,7 +18,7 @@ F017 does not invoke, import or modify AI_Video_Editor, and the legacy
 ```text
 library/
   footage/scene_001.mp4 ...
-  footage_manifest.json            # F015, bin_finder_export_v1 unchanged
+  footage_manifest.json            # F015, bin_finder_final_export_v1 unchanged
   footage_index.csv                # optional F015
   _bin_finder_handoff.json         # NEW, only when ExportOptions(handoff=True)
   _ai_video_editor_bin_finder_adapter.json / _bin_finder_acceptance.json  # only on request

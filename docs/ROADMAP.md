@@ -37,8 +37,10 @@ Validated F013 workflow identity/hash references are historical hints only,
 not restored approvals.
 GUI lifecycle restores validated state and recomputes F010/F015 readiness. See [F016 contract](F016_SESSION_RECOVERY.md).
 
-F017: Stable handoff contract and portable footage package. **Implemented; local
-acceptance PASS, Windows CI pending**. Opt-in `_bin_finder_handoff.json`
+F017: Stable handoff contract and portable footage package. **PASS (Windows CI +
+real FFmpeg handoff acceptance)**: run #157 (ID 39816530610) success, 471 passed,
+0 skipped, 0 failed, pinned FFmpeg 9.0.2 SHA-256 verified; F015/F016/F017 real smokes
+PASS. AI_Video_Editor integration is not part of F017. Opt-in `_bin_finder_handoff.json`
 (`bin_finder_handoff_v1`) built inside the F015 staging transaction, package-relative
 paths, read-only `verify_handoff_package()`, real FFmpeg move/tamper/missing smoke.
 Legacy adapter v1 and F010/F014/F015/F016 semantics unchanged. See
