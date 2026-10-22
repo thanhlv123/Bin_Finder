@@ -19,7 +19,7 @@ def fixture_workflow(tmp_path, monkeypatch):
     media.write_bytes(b"F016 historical workflow fixture")
     project_id = "sample-project"
     root = tmp_path / "workflows" / digest(project_id)[:24]
-    monkeypatch.setattr(session_workflow, "default_work_root", lambda _: root)
+    monkeypatch.setattr(session_workflow, "default_work_root", lambda project: tmp_path / 'workflows' / digest(project)[:24])
     candidate = CandidateRecord("candidate-001", "scene_001", "local",
                                 "local:asset-001", "Fixture", 10.0, .9)
     identity = [candidate.scene_id, candidate.candidate_id,
