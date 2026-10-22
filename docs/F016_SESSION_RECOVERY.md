@@ -18,10 +18,23 @@ references until F014 source identity evidence can be revalidated on load.
 No candidate approval is promoted into final approval, no READY flag is
 serialized, and no provider response or downloaded media is stored.
 
+## Phase 2: local final-approval recovery
+
+F014 `SelectedClipRecord` values can now be converted to a strictly allowlisted
+session representation. Only explicit final records are serialized; arbitrary
+candidate/provider payloads, source URLs (including signed queries), and
+unknown metadata keys are not persisted. The stored SHA-256 is mandatory.
+`restore_session()` validates the snapshot, rejects linked/missing/empty files,
+re-hashes local media and retains only exact identity matches. Invalid selections
+become unresolved with a reason, never silently reapproved. Remote-origin
+selections are unresolved until their original F012 acquisition authorization
+can be independently verified; a hash alone is not sufficient. F010/F015 gates
+must still be recomputed by the GUI; persistence never stores READY.
+
 ## Remaining acceptance work
 
-- Implement allowlisted final clip evidence and SHA-256 revalidation.
-- Restore invalid or missing media as unresolved scenes.
+- Integrate the validated restoration result with GUI scene/filmstrip state.
+- Add independent F012 authorization evidence for remote-origin selections.
 - Add minimal workflow reference persistence without storing provider data.
 - Connect GUI save/restore on project lifecycle without changing panel geometry.
 - Recompute F010 readiness after restore; retain F015 READY-only export.
