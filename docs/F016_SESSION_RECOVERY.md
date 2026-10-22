@@ -26,10 +26,12 @@ candidate/provider payloads, source URLs (including signed queries), and
 unknown metadata keys are not persisted. The stored SHA-256 is mandatory.
 `restore_session()` validates the snapshot, rejects linked/missing/empty files,
 re-hashes local media and retains only exact identity matches. Invalid selections
-become unresolved with a reason, never silently reapproved. Remote-origin
-selections are unresolved until their original F012 acquisition authorization
-can be independently verified; a hash alone is not sufficient. F010/F015 gates
-must still be recomputed by the GUI; persistence never stores READY.
+become unresolved with a reason, never silently reapproved. Remote-origin selections require independent revalidation of the original
+F012 app-local cache manifest: provider/source, cache directory, explicit
+acquisition marker, rendition identity, size and SHA-256 must match. Signed
+rendition URLs are never persisted. This uses F012's app-controlled cache
+trust boundary, not a copyright license or new final approval. F010/F015
+readiness is recomputed by the GUI and never persisted.
 
 ## Phase 3: GUI session lifecycle
 
@@ -65,5 +67,5 @@ still apply. Re-splitting a script or changing project clears these references.
 
 ## Remaining acceptance work
 
-- Add independent F012 authorization evidence for remote-origin selections.
 - Run full Windows CI and security/artifact review before PR/merge.
+- Confirm restored READY-only F015 export on Windows.

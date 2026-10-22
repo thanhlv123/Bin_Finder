@@ -13,6 +13,7 @@ from bin_finder.final_selection import build_final_project
 from bin_finder.models import SceneRecord, SelectedClipRecord
 from bin_finder.session_codec import scene_from_data, validate_snapshot
 from bin_finder.session_workflow import restore_workflow_refs
+from bin_finder.session_remote import verified_remote_session_media
 
 
 @dataclass(frozen=True)
@@ -41,8 +42,8 @@ def _safe_regular_file(value):
 def restore_session(payload) -> RestoredSession:
     """Return only revalidated final selections; stale scenes stay unresolved.
 
-    Remote-origin selections cannot be reauthorized from F014's final record
-    alone (the F012 acquisition manifest is not stored), so they fail closed.
+    Remote-origin selections require independently validated F012 cache provenance
+    in addition to their original explicit F014 final approval.
     """
     snapshot = validate_snapshot(payload)
     scenes = tuple(scene_from_data(item) for item in snapshot["scenes"])
@@ -50,9 +51,6 @@ def restore_session(payload) -> RestoredSession:
     unresolved = []
     for row in snapshot["final_selections"]:
         scene_id = row["scene_id"]
-        if row["provider"] != "local":
-            unresolved.append((scene_id, "remote-provenance-required"))
-            continue
         try:
             path = _safe_regular_file(row["local_file"])
             if path is None:
@@ -60,6 +58,9 @@ def restore_session(payload) -> RestoredSession:
                 continue
             if fingerprint_file(path).sha256 != row["source_metadata"]["media_sha256"]:
                 unresolved.append((scene_id, "media-identity-changed"))
+                continue
+            if row["provider"] != "local" and not verified_remote_session_media(row, path):
+                unresolved.append((scene_id, "remote-provenance-required"))
                 continue
             clip = SelectedClipRecord(
                 clip_id=row["clip_id"], scene_id=scene_id,

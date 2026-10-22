@@ -133,7 +133,8 @@ Python 3.12 + PyQt6. Run:
 
 F010 adds a strict 1–3 minute acceptance gate, per-scene readiness reporting, score/coverage metrics, rotation/overlap validation, and a versioned `ai_video_editor_bin_finder_adapter_v1` manifest. Bin Finder still does not modify AI_Video_Editor; the adapter is the stable handoff contract for the later integration step after Windows acceptance.
 
-F016 is in progress: atomic session snapshots now include allowlisted explicit local final selections. On restore, SHA-256 and local path safety are rechecked; missing/changed media and remote-origin selections without independent F012 proof remain unresolved. GUI session lifecycle now restores validated scenes/filmstrip and recomputes F010/F015 readiness; remote F012 provenance remains pending. F013 workflow references now restore
-as validated historical identity/hash hints, never as analysis or approvals.
+F016 is in progress: atomic session snapshots now include allowlisted explicit local final selections. On restore, SHA-256 and local path safety are rechecked; missing/changed media and remote-origin selections without independent F012 proof remain unresolved. GUI session lifecycle now restores validated scenes/filmstrip and recomputes F010/F015 readiness; remote F012 selections require independent F012 cache-manifest and SHA-256
+revalidation. F013 workflow references restore as historical identity/hash
+hints, never as analysis or approvals.
 
 See `docs/ROADMAP.md` for the milestone plan.
