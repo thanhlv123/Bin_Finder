@@ -18,6 +18,7 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 - **F015 final footage export library:** PASS (offline + real FFmpeg smoke)
 - **F016 session persistence / recovery:** PASS (Windows CI 407 passed, 0 skipped + real FFmpeg restore/export smoke)
 - **F017 stable handoff contract / portable package:** PASS (Windows CI + real FFmpeg handoff acceptance: run #157, 471 passed, 0 skipped)
+- **F019 long-form acceptance policy:** implemented, local acceptance PASS (Windows CI pending)
 - **F018 production scene planning / context enrichment:** implemented, local acceptance PASS (Windows CI pending)
 
 Candidate approval for acquisition/analysis is separate from final clip approval.
@@ -165,5 +166,12 @@ bounded grouping, 3.5–7.0 s duration estimate (one scene = one F006 clip; long
 keyword fallback) instead of the prototype period split. No LLM/VLM, no new dependency;
 F010 acceptance and F014 explicit approval are unchanged. See
 [F018 details](docs/F018_PRODUCTION_SCENE_PLANNING.md).
+
+F019 long-form acceptance: F010's default (`evaluate_project(project)`) still means a
+60–180 s project. GUI readiness and final export now use
+`production_acceptance_policy()`: at least 60 s and no artificial 180 s ceiling, with
+coverage, score, rotation and overlap gates unchanged. Structural bounds (F018 input
+and scene limits, session limits) still apply. See
+[F019 details](docs/F019_LONG_FORM_ACCEPTANCE.md).
 
 See `docs/ROADMAP.md` for the milestone plan.

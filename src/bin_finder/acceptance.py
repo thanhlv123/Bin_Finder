@@ -9,7 +9,8 @@ from bin_finder.models import FootageProject, SelectedClipRecord
 @dataclass(frozen=True)
 class AcceptancePolicy:
     min_duration_seconds: float = 60.0
-    max_duration_seconds: float = 180.0
+    # None = no project-level upper duration limit (F019 production long-form policy).
+    max_duration_seconds: float | None = 180.0
     min_final_score: float = 0.60
     require_all_scenes: bool = True
     require_clean_rotation: bool = True
@@ -18,10 +19,27 @@ class AcceptancePolicy:
     def validate(self) -> None:
         if self.min_duration_seconds < 0:
             raise ValueError("min_duration_seconds must be >= 0")
-        if self.max_duration_seconds < self.min_duration_seconds:
+        if (self.max_duration_seconds is not None
+                and self.max_duration_seconds < self.min_duration_seconds):
             raise ValueError("max_duration_seconds must be >= min_duration_seconds")
         if not 0.0 <= self.min_final_score <= 1.0:
             raise ValueError("min_final_score must be between 0 and 1")
+
+
+def production_acceptance_policy() -> AcceptancePolicy:
+    """F019 production policy: at least 60 s, no artificial upper ceiling.
+
+    ``evaluate_project(project)`` keeps the historical F010 default (60-180 s). Every
+    other gate (coverage, score, rotation, overlap) is identical.
+    """
+    return AcceptancePolicy(
+        min_duration_seconds=60.0,
+        max_duration_seconds=None,
+        min_final_score=0.60,
+        require_all_scenes=True,
+        require_clean_rotation=True,
+        require_no_overlap=True,
+    )
 
 
 @dataclass(frozen=True)
@@ -125,7 +143,8 @@ def evaluate_project(
     duration_issue = ""
     if expected_duration < policy.min_duration_seconds:
         duration_issue = "expected-duration-below-minimum"
-    elif expected_duration > policy.max_duration_seconds:
+    elif (policy.max_duration_seconds is not None
+          and expected_duration > policy.max_duration_seconds):
         duration_issue = "expected-duration-above-maximum"
 
     rotation_issues = tuple(project.validate_rotation())

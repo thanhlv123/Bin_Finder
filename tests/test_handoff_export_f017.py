@@ -103,7 +103,7 @@ def test_metadata_disabled_omits_provenance_but_keeps_required_fields(tmp_path):
 def test_f010_not_rerun_on_materialized_coordinates(tmp_path, monkeypatch):
     calls = []
     original = core.evaluate_project
-    monkeypatch.setattr(core, "evaluate_project", lambda p: calls.append(p) or original(p))
+    monkeypatch.setattr(core, "evaluate_project", lambda p, policy=None: calls.append(p) or original(p, policy))
     result = export_package(tmp_path)
     assert len(calls) == 1 and [c.start for c in calls[0].selected_clips] == [10, 0, 30]
     assert [s["footage"]["original_source_start_seconds"]
