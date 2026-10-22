@@ -29,7 +29,7 @@ A–B–A passes without changing F010 overlap semantics or adapter v1. Acceptan
 real offline FFmpeg A–B–A smoke passed. See
 [F015 contract](F015_FINAL_FOOTAGE_EXPORT.md).
 
-F016: Versioned session persistence and recovery. **IN PROGRESS**. Scene/UI snapshots and allowlisted final-selection serialization with local SHA-256 revalidation are implemented; remote proof, GUI restore, workflow references and final Windows acceptance remain. See [F016 contract](F016_SESSION_RECOVERY.md).
+F016: Versioned session persistence and recovery. **IN PROGRESS**. Scene/UI snapshots and allowlisted final-selection serialization with local SHA-256 revalidation are implemented; remote proof, workflow references and final Windows acceptance remain. GUI lifecycle now restores validated state and recomputes F010/F015 readiness. See [F016 contract](F016_SESSION_RECOVERY.md).
 
 ## Architecture principles learned from public footage-search projects
 

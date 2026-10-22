@@ -36,6 +36,7 @@ from bin_finder.gui.final_review_worker import FinalReviewWorker
 from bin_finder.final_selection import build_final_project
 from bin_finder.final_export import ExportOptions
 from bin_finder.gui.final_export_worker import FinalExportWorker
+from bin_finder.gui.session_lifecycle import SessionLifecycle
 from bin_finder.acceptance import evaluate_project
 from bin_finder.workflow import WorkflowRequest, WorkflowService
 from bin_finder.acquisition import AcquisitionRequest, AcquisitionService
@@ -79,6 +80,7 @@ class MainWindow(QMainWindow):
         self._final_item = None
         self._final_options = ()
         self._final_generation = 0
+        self._session_restoring = False
 
         project_root = Path(__file__).resolve().parents[3]
         self.provider_config = ProviderConfig.load(project_root)
@@ -86,6 +88,7 @@ class MainWindow(QMainWindow):
         self.discovery_service = DiscoveryService(self.provider_registry)
 
         self._build()
+        self._session_lifecycle = SessionLifecycle(self)
         self._search_scene(self._current_scene)
 
     def _build(self):
@@ -263,10 +266,13 @@ class MainWindow(QMainWindow):
         return nav
 
     def _scene_changed(self, scene: SceneRecord):
+        if self._session_restoring:
+            return
         self._current_scene = scene
         self._clear_final_options()
         self.review_panel.set_scene(scene)
         self._search_scene(scene)
+        self._session_lifecycle.schedule()
 
     def _search_current_scene(self):
         self._search_scene(self._current_scene)
@@ -528,6 +534,7 @@ class MainWindow(QMainWindow):
         if any(worker.isRunning() for worker in self._search_workers):
             event.ignore()
             return
+        self._session_lifecycle.close()
         super().closeEvent(event)
 
     def _record_review(self, candidate: CandidateRecord, decision: str):
@@ -631,8 +638,12 @@ class MainWindow(QMainWindow):
         self._ab_anchor = None
         self.review_panel.set_comparison_pending(False)
         self._search_scene(scenes[0])
+        self._session_lifecycle.schedule()
 
     def _project_changed(self):
+        if self._session_restoring:
+            return
+        self._session_lifecycle.project_changed()
         self.final_selections = ()
         self.workflow_results.clear()
         self._clear_final_options()
@@ -705,6 +716,7 @@ class MainWindow(QMainWindow):
             self.scene_panel.mark_selected(worker.scene.scene_id)
             self.workflow_status.setText("Đã duyệt clip cuối")
             self._refresh_acceptance()
+            self._session_lifecycle.schedule()
         else:
             self.workflow_status.setText("Không thể duyệt: " + result.reason)
 

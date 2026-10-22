@@ -31,11 +31,23 @@ selections are unresolved until their original F012 acquisition authorization
 can be independently verified; a hash alone is not sufficient. F010/F015 gates
 must still be recomputed by the GUI; persistence never stores READY.
 
+## Phase 3: GUI session lifecycle
+
+The existing seven-panel GUI now loads the active session at startup and
+restores script, scenes, current scene, export directory, and explicit F014
+final selections only after the F016 local SHA-256/path revalidation. It
+projects validated selections into the scene badges and filmstrip and
+recomputes F010 readiness and F015 READY-only export from scratch.
+Candidate review state and READY are never restored as approvals.
+
+Script, output-directory, scene and final-approval changes are saved with
+a short debounce. Closing flushes the session after active workers finish;
+project-name changes save the previous project before clearing its approvals.
+Corrupt/unsafe active snapshots are not overwritten by demo data on close.
+Each test uses isolated local application data to prevent cross-test sessions.
+
 ## Remaining acceptance work
 
-- Integrate the validated restoration result with GUI scene/filmstrip state.
 - Add independent F012 authorization evidence for remote-origin selections.
 - Add minimal workflow reference persistence without storing provider data.
-- Connect GUI save/restore on project lifecycle without changing panel geometry.
-- Recompute F010 readiness after restore; retain F015 READY-only export.
 - Run full Windows CI and security review before PR/merge.
