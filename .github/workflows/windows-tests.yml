@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - "bin-finder-f*"
+      - "feature/f*"
   pull_request:
     branches: [main]
 
