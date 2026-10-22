@@ -57,6 +57,11 @@ Windows CI pending**. F010 default stays 60–180 s; GUI readiness and F015 expo
 `production_acceptance_policy()` (min 60 s, no upper ceiling). Other gates, F014, F006,
 F017 schemas unchanged. See [F019 contract](F019_LONG_FORM_ACCEPTANCE.md).
 
+F020: Portable handoff GUI. **Implemented; local acceptance PASS, Windows CI pending**.
+Panel 7 exposes the F017 handoff (checked by default, independent of the legacy adapter);
+core `ExportOptions().handoff` stays opt-in. No schema or acceptance changes; consumer
+integration still not implemented. See [F020 contract](F020_PORTABLE_HANDOFF_GUI.md).
+
 ## Architecture principles learned from public footage-search projects
 
 Bin Finder follows a clean-room design inspired by common retrieval patterns:

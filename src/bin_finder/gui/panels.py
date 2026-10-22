@@ -810,6 +810,14 @@ class ExportPanel(Panel):
         line.addWidget(choose)
         line.addStretch(1)
         destination.addLayout(line)
+        # F020: independent of the legacy AI_Video_Editor adapter below; on by default in the GUI
+        # (the core ExportOptions.handoff default stays False).
+        self.handoff_option = QCheckBox("Tạo gói handoff portable")
+        self.handoff_option.setChecked(True)
+        self.handoff_option.setToolTip(
+            "Tạo _bin_finder_handoff.json (bin_finder_handoff_v1): đường dẫn tương đối, SHA-256 "
+            "và số byte để AI_Video_Editor import sau này. Độc lập với gói AI_Video_Editor cũ")
+        destination.addWidget(self.handoff_option)
         destination.addStretch(1)
         content.addLayout(destination, 48)
 
@@ -837,6 +845,8 @@ class ExportPanel(Panel):
         self.export_options[2].setToolTip("Manifest JSON bắt buộc để xác nhận thư viện hoàn chỉnh")
         self.export_options[4].setToolTip("Lưu provenance mở rộng; ID, điểm và quyền luôn có trong manifest")
         self.adapter_option = QCheckBox("Tạo gói AI_Video_Editor")
+        self.adapter_option.setToolTip(
+            "Gói tương thích cũ ai_video_editor_bin_finder_adapter_v1; độc lập với gói handoff portable")
         options.addWidget(self.adapter_option, 2, 1)
         content.addLayout(options, 52)
         self.body.addLayout(content, 1)

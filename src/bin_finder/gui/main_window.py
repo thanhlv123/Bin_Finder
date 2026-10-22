@@ -752,7 +752,8 @@ class MainWindow(QMainWindow):
         checks = self.export_panel.export_options
         options = ExportOptions(csv_index=checks[3].isChecked(),
             integration_adapter=self.export_panel.adapter_option.isChecked(),
-            scene_id_filenames=checks[1].isChecked(), include_metadata=checks[4].isChecked())
+            scene_id_filenames=checks[1].isChecked(), include_metadata=checks[4].isChecked(),
+            handoff=self.export_panel.handoff_option.isChecked())
         worker = FinalExportWorker(self.project_panel.project_name.text(), self.scenes,
             self.final_selections, self.export_panel.dest.text(), options)
         self._export_worker = worker
@@ -777,7 +778,10 @@ class MainWindow(QMainWindow):
     def _export_complete(self, result):
         messages = {"success": "Đã xuất footage", "cancelled": "Đã hủy xuất footage",
                     "failed": "Xuất thất bại: " + result.error, "not_ready": "Chưa READY"}
-        self.export_panel.export_status.setText(messages[result.status])
+        text = messages[result.status]
+        if result.status == "success" and result.handoff_path is not None:
+            text += " · Handoff portable"
+        self.export_panel.export_status.setText(text)
 
     def _export_finished(self):
         worker = self._export_worker

@@ -61,7 +61,7 @@ def test_gui_ready_only_explicit_export_success_and_queued_progress(fixture_expo
         assert worker_threads and all(t != APP.thread() for t in worker_threads)
         assert progress and all(t == APP.thread() for t in gui_threads)
         assert progress[-1].completed == 3 and progress[-1].scene_id == "scene_003"
-        assert window.export_panel.export_status.text() == "Đã xuất footage"
+        assert window.export_panel.export_status.text() == "Đã xuất footage · Handoff portable"  # F020 GUI default
         assert window._export_worker is None and not window.export_panel.cancel_export.isEnabled()
         assert (f.destination / "footage_manifest.json").is_file()
     finally:

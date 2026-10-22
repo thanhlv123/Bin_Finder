@@ -41,7 +41,7 @@ def test_gui_restart_restores_ready_and_exports_with_real_ffmpeg(tmp_path, monke
         assert worker is not None
         assert worker.wait(120000)
         APP.processEvents()
-        assert window.export_panel.export_status.text() == "Đã xuất footage"
+        assert window.export_panel.export_status.text() == "Đã xuất footage · Handoff portable"  # F020 GUI default
         manifest = json.loads((destination / "footage_manifest.json").read_text(encoding="utf-8"))
         assert manifest["readiness"]["ready"]
         assert [r["original_source_start_seconds"] for r in manifest["clips"]] == [10, 0, 30]
