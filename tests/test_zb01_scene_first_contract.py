@@ -301,3 +301,46 @@ def test_scene_14_cannot_hide_drift_behind_single_country_anchor():
             bad, scene_id="CUBA-14", narration_text=narration,
             full_script="Vintage cars are famous in Cuba. " + narration,
         )
+
+
+
+def test_multi_subject_beat_uses_separate_grounded_search_options():
+    narration = "A seaside coast and handmade crafts welcome travelers."
+    obj = _plan(
+        "SYN-01", narration, anchor="seaside coast and handmade crafts",
+        evidence="contextual",
+        queries=["seaside coast waves and sand", "handmade crafts artisans at work"],
+    )
+    intent = SceneSearchIntent.from_mapping(
+        obj, scene_id="SYN-01", narration_text=narration, full_script=narration,
+    )
+    assert len(intent.queries) == 2
+    assert "coast" not in intent.queries[1].lower()
+    assert "crafts" not in intent.queries[0].lower()
+
+
+def test_abstract_bridge_can_validly_abstain_but_not_add_exclusions():
+    narration = "The situation begins to change in unexpected ways."
+    obj = _plan(
+        "SYN-02", narration, anchor="situation begins to change",
+        evidence="no_match", queries=[],
+        uncertainty="An abstract change is not an observable shot.",
+    )
+    assert SceneSearchIntent.from_mapping(
+        obj, scene_id="SYN-02", narration_text=narration, full_script=narration,
+    ).queries == ()
+    disallowed = {**obj, "must_not_show": ["all tourists"]}
+    with pytest.raises(InvalidIntent, match="no-match-has-search-requirements"):
+        SceneSearchIntent.from_mapping(
+            disallowed, scene_id="SYN-02", narration_text=narration,
+            full_script=narration,
+        )
+
+
+def test_prompt_mentions_visual_observability_and_separate_subjects():
+    for phrase in (
+        "VISUAL OBSERVABILITY", "audible sound", "private feeling",
+        "multi-hour duration", "MULTI-SUBJECT", "SEPARATE alternative queries",
+        "establishing identity line", "abstract narrative transition",
+    ):
+        assert phrase in SYSTEM_RULES
