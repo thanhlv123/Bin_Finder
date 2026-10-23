@@ -125,3 +125,20 @@ The changes below are **prompt/harness research**, NOT a claimed footage-accurac
 - When the user explicitly opts into `--inspect-rejected`, include `planner_diagnostics.rejected_plan_preview.field_shapes` to reveal **only** the JSON type and bounded array length for `queries/required_entities/must_show/must_not_show`. No failed model raw payload, story text or thinking.
 
 **New live evaluation required:** rerun representative scenes 03, 05, 07, 09, 10, 13 and 15, alongside the known risk scene 14, using exactly the same private local JSON. Judge visual observability and editorial evidence, not merely `valid`. Do not integrate into production or start footage acquisition unless quality evidence supports it.
+
+
+## V4 evidence review and V5 schema-only A/B (research)
+
+User-provided V4 localhost Instruct study of 8 hard beats (03,05,07,09,10,13,14,15):
+- `valid`: 5/8; fallback: 3/8 (09 `query-lost-scene-focus`, 10 same, 15 `invalid-list`); `no_match`: zero.
+- V3 for exactly these 8 beats: 4/8 `valid`, 4/8 fallback (03,07,13,14 valid; 05,09,10,15 fallback).
+- Scene 05 improved structurally, but mixes establishing images.
+- Scene 03 still includes unobservable "ambient sound visible" and an unsupported "no people" exclusion even though the V4 prompt forbids both. Scene 07 still combines independent sea/cigar motifs in one frame. These illustrate why **prompt obedience and structure are distinct from stock search utility**.
+- Scene 09 and 10 rejected candidate plans reused earlier tourist scenes, so the existing scene-first gate correctly blocked drift, but F002 fallback is not a satisfactory search for a narrative transition.
+- Scene 13 draws an inference from dark streets to an outage; no footage proves duration. Scene 14 selects related products but cannot prove exported prices. Scene 15 returned **4 searches**, exceeding the 3-query contract; do not silently truncate and claim accuracy.
+
+V5 isolates the `invalid-list` cause with Ollama's **optional JSON Schema `format`**; this has been documented by Ollama's official API. Default `format: "json"` is unchanged. The optional `--structured-output` flag requires `--approve-local-planner` and instructs Ollama with an explicit schema (queries maxItems=3, other arrays bounded, evidence enum); the existing local SceneSearchIntent validation **still runs**. No schema setting can independently prove footage relevance, enforce editorial truth, or guarantee model support on every installation.
+
+For a comparable local run, first evaluate the V4 baseline using the same version without `--structured-output`, then the same selected beats with `--structured-output`, preserving both reports and model/provider settings. Focus on CUBA-03,07,09,10,15 and the regression sentinel CUBA-14; CUBA-15 is the structural target. **Do not replace the original V4 result** and do not call these results an independent benchmark (model nondeterminism, private preliminary editorial annotations, no real footage retrieval).
+
+No change to Bin Finder production search, GUI, the F021 verifier, remote providers, model tags, or main. The PR remains draft pending human semantic review and footage quality trials.
