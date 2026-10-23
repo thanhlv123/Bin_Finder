@@ -203,6 +203,8 @@ def parse_visual_story_plan(
         evidence = _string(raw.get("evidence_type"), "evidence", 40)
         if strategy not in _STRATEGIES or evidence not in _EVIDENCE:
             raise VisualPlanningError("invalid-strategy-or-evidence")
+        if not shots and strategy not in {"search", "graphic"}:
+            raise VisualPlanningError("missing-opening-visual")
         raw_queries = raw.get("queries")
         if not isinstance(raw_queries, list) or len(raw_queries) > 3:
             raise VisualPlanningError("invalid-shot-queries")
