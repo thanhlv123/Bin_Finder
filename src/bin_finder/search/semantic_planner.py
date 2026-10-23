@@ -202,7 +202,7 @@ class LocalEditorialPlanner:
                 full_script=full_script,
             )
             mark("valid")
-            return {
+            result = {
                 "scene_id": validated.scene_id,
                 "narration_text": validated.narration_text,
                 "visual_goal": validated.visual_goal,
@@ -211,10 +211,15 @@ class LocalEditorialPlanner:
                 "must_not_show": list(validated.must_not_show),
                 "queries": list(validated.queries),
                 "uncertainty": validated.uncertainty,
-                "evidence_type": validated.evidence_type,
-                "scene_anchor": validated.scene_anchor,
                 "provenance": validated.provenance,
             }
+            # Preserve the legacy draft contract for existing editor/model
+            # fixtures. A new-style response always carries both fields and
+            # is revalidated with its scene-first grounding when adapted.
+            if "evidence_type" in obj:
+                result["evidence_type"] = validated.evidence_type
+                result["scene_anchor"] = validated.scene_anchor
+            return result
         except InvalidIntent as exc:
             # InvalidIntent uses fixed machine codes; no model text is disclosed.
             mark("invalid-intent:" + str(exc))
