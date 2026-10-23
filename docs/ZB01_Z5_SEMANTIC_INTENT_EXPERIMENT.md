@@ -46,3 +46,17 @@ Windows local test command (on the ZB-01 research branch; not F021):
 3. Compare baseline vs planned queries using identical provider searches and labeled clips: Recall@5, Precision@5, wrong-subject rate, NO_MATCH, latency and VLM cost.
 4. Wire behind an explicit opt-in flag only if evidence shows a benefit; preserve legacy fallback and human approval.
 5. Do not add GitHub repos unless Z5-first proves insufficient.
+
+## Explicit live local Ollama smoke (not CI)
+
+Only in an isolated ZB-01 checkout with Ollama already installed and the qwen3-vl:4b model available. The no-flag invocation is guaranteed not to create the planner or contact a service:
+
+    $env:PYTHONPATH = "src"
+    python -m bin_finder.search.semantic_smoke
+
+To send one text-only query-planning request to local Ollama (not to Z5 or a third-party service), explicitly opt in:
+
+    $env:PYTHONPATH = "src"
+    python -m bin_finder.search.semantic_smoke --approve-local-planner
+
+The script compares baseline and proposed queries for a fixed synthetic example about illuminated office towers. It returns code 2 with ZB01_FALLBACK when no valid structured output is obtained. Any valid JSON is still just a planning candidate: do not treat it as proof that footage was actually found or that the proposed video depicts what was narrated. Do not execute the live smoke in pytest/CI.
