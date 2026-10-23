@@ -125,3 +125,35 @@ def test_invalid_ranges_never_call_planner():
 def test_reject_unapproved_injected_planner():
     with pytest.raises(target.ReferenceError):
         target.evaluate_reference(_reference()["beats"], planner=object())
+
+
+def test_rejected_inspection_requires_explicit_model_approval(tmp_path, capsys):
+    path = tmp_path / "reference.json"
+    path.write_text(json.dumps(_reference()), encoding="utf-8")
+    assert target.main(["--reference", str(path), "--inspect-rejected"]) == 2
+    assert "inspection-requires-local-planner-approval" in capsys.readouterr().out
+
+
+def test_opt_in_rejection_preview_passes_only_selected_bounded_fields():
+    class RejectedPlanner:
+        def propose(self, scene, *, full_script, diagnostics, inspect_rejection):
+            assert inspect_rejection is True
+            assert "PRIVATE_REFERENCE_QUERY" not in full_script
+            diagnostics["reason"] = "invalid-intent:insufficient-scene-focus"
+            diagnostics["rejected_plan_preview"] = {
+                "scene_anchor": "machines repaired",
+                "queries": ["old classic car repair"],
+                "evidence_type": "direct",
+            }
+            return None
+
+    result = target.evaluate_reference(
+        _reference()["beats"], start=12, count=1,
+        approve_local_planner=True,
+        inspect_rejection=True, planner=RejectedPlanner(),
+    )[0]
+    assert result["used_legacy_fallback"] is True
+    assert result["planner_diagnostics"]["rejected_plan_preview"]["queries"] == [
+        "old classic car repair"
+    ]
+    assert result["planner_status"] == "invalid-intent:insufficient-scene-focus"
