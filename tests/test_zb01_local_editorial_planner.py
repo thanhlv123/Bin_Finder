@@ -191,17 +191,13 @@ def test_bounded_rejected_preview_is_opt_in_and_never_captures_script_or_thinkin
 
 
 def test_rejection_preview_stays_bounded_on_untrusted_values():
+    from bin_finder.search.semantic_planner import _bounded_rejected_preview
+
     bad = valid_plan()
     bad["required_entities"] = ["Beijing"]
     bad["queries"] = ["X" * 100_000]
     bad["scene_anchor"] = "Y" * 100_000
-    diagnostic = {}
-    planner = LocalEditorialPlanner(opener=FakeOpener(bad))
-    assert planner.propose(
-        scene(), full_script=SCRIPT, diagnostics=diagnostic,
-        inspect_rejection=True,
-    ) is None
-    preview = diagnostic["rejected_plan_preview"]
+    preview = _bounded_rejected_preview(bad)
     assert "queries" not in preview
     assert "scene_anchor" not in preview
-    assert "required_entities" in preview
+    assert preview["required_entities"] == ["Beijing"]
