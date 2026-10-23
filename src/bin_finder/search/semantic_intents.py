@@ -176,7 +176,7 @@ class SceneSearchIntent:
         if "evidence_type" in obj:
             anchor = _text(obj.get("scene_anchor"), max_chars=160, required=True)
         if evidence == "no_match":
-            if queries or required or must_show:
+            if queries or required or must_show or must_not_show:
                 raise InvalidIntent("no-match-has-search-requirements")
             if not _text(obj.get("uncertainty", ""), max_chars=300, required=True):
                 raise InvalidIntent("no-match-without-reason")
