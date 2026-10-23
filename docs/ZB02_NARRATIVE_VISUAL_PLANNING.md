@@ -164,3 +164,30 @@ The user ran `visual_director_smoke --genre travel --approve-local-planner` at c
 **Interpretation:** technical/local-model and structure pass. The scene-003 transition is **not renderable by itself**: no footage is allocated for that narration interval. Later scheduling must ensure a real visual (continue s2, start s4 earlier, or an approved bridging shot) covers any transition-only spoken interval. Structural coverage does not imply frame-by-frame visual coverage. The trial generated one shot action per narrated scene, and it did **not** actually exercise multi-scene `search` or the `hold` strategy; offline tests cover those contracts but the real model has not demonstrated them.
 
 **Not established:** actual stock availability, visual relevance rankings, source licenses, scene-to-shot timing, human editability, or improvement against the old workflow. Test history and economy with the same pinned commit and model before considering a general quality claim. Do not modify production timeline or merge PR #31.
+
+
+## Three-genre live Visual Director comparison (user-run; pinned 5930178)
+
+At the pinned `qwen3-vl:4b-instruct` model and the 4-scene synthetic scripts:
+
+| Genre | Blocks | Shots | Search | Hold | Transition | Graphic |
+|---|---:|---:|---:|---:|---:|---:|
+| Travel | 2 | 4 | 3 | 0 | 1 | 0 |
+| History | 3 | 4 | 4 | 0 | 0 | 0 |
+| Economy | 2 | 4 | 3 | 0 | 1 | 0 |
+| **Total** | **7** | **12** | **10** | **0** | **2** | **0** |
+
+All three generated **valid schemas** and Ollama `done_reason=stop`. This shows the local model can organize narration into blocks and detect some bridges. It does **not** show a reduction in unnecessary cuts, actual shot reuse, availability of stock results, or continuity across a real timeline. All three model-produced plans had one shot per narration scene, with no `hold` and no multi-scene search shot. A search count of 10/12 should **not** become a target ratio in isolation; some beats legitimately merit multiple shots.
+
+Manual editorial review of the user's **separate local outputs**:
+- **Travel:** scene 003 is a transition-only marker without any assigned visible medium. Future scheduler must decide whether the previous visual holds through that beat or next footage enters early; neither is yet proven renderable.
+- **History:** the concept of merchant activity on an ancient bridge is relevant, but a contemporary reenactment cannot independently prove an actual past event. Search footage for trade routes maps might be a useful source asset; the map's dates, geography, and provenance still require verification. No blanket rule against historical stock maps.
+- **Economy:** scene 003 is another transition-only beat. Scene 004 requests stock footage of a "chart showing verified salary and price data", marked as `direct`. A video image of a chart does **not** establish that its figures are verified. A fact-checked `graphic` may be preferable, or appropriate stock may be used explicitly as non-evidentiary illustration.
+
+**Actionable next step (now added):** a separate, **read-only Visual Plan Audit**, implemented in `src/bin_finder/visual_plan_audit.py` and printed by `visual_director_smoke`. It counts block/shot/search/hold/transition/graphic actions, multi-scene shots and scenes with overlapping shots. It raises **review flags**, not automatic rejection:
+- `transition-only-visual-coverage-unresolved`: a narrated scene has only `transition` actions, hence no allocated searchable, held or graphic visual. This is a scheduling question.
+- `graphic-like-content-routed-to-stock-search`: proposed stock footage resembles a chart/graph/infographic. This is **only** a type/format heuristic; such stock might legitimately be reused as illustrative B-roll, so neither the strategy nor its evidence type is silently changed.
+
+The audit is deliberately **genre-neutral**, and tested with travel/history/economy fixtures. It never reads or exports narration text, executes searches, allocates timing, or changes a valid storyboard. Flags merely identify human review opportunities; they do not establish semantic accuracy.
+
+**Next evaluation gate:** First inspect these audit diagnostics on synthetic smoke; then, if useful, compare model suggestions for longer segments and explicit `hold`/multi-scene opportunities. Do **not** increase token/context budgets, alter production scene mapping or merge PR #31 merely to maximize the count of non-search actions.
