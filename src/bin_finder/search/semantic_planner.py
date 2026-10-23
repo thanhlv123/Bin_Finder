@@ -115,6 +115,31 @@ SYSTEM_RULES = (
 )
 
 
+def _bounded_rejected_preview(obj: object) -> dict[str, object]:
+    """Opt-in diagnostics: model's proposed intent ONLY, never hidden thinking.
+
+    Raw model content, narration_text, source script and credentials are excluded.
+    Values are type/size bounded so malformed model output cannot inflate logs.
+    """
+    if not isinstance(obj, dict):
+        return {}
+    preview: dict[str, object] = {}
+    for name, limit in (("scene_anchor", 160), ("evidence_type", 40),
+                        ("visual_goal", 300), ("uncertainty", 300)):
+        value = obj.get(name)
+        if isinstance(value, str) and len(value) <= limit:
+            preview[name] = value
+    for name, limit, max_count in (
+        ("queries", 160, 3), ("required_entities", 100, 6),
+        ("must_show", 150, 6),
+    ):
+        values = obj.get(name)
+        if (isinstance(values, list) and len(values) <= max_count
+                and all(isinstance(v, str) and len(v) <= limit for v in values)):
+            preview[name] = values
+    return preview
+
+
 def _story_overview(script: str, capsule: StoryCapsule | None) -> str:
     if capsule is not None:
         if not isinstance(capsule, StoryCapsule):
@@ -140,8 +165,9 @@ class LocalEditorialPlanner:
 
     def propose(self, scene, *, full_script: str,
                 capsule: StoryCapsule | None = None,
-                diagnostics: dict[str, object] | None = None) -> Mapping[str, object] | None:
-        """Optional safe diagnostic metadata; never records generated text or input."""
+                diagnostics: dict[str, object] | None = None,
+                inspect_rejection: bool = False) -> Mapping[str, object] | None:
+        """Diagnostics show model fields only with explicit rejection opt-in."""
         if diagnostics is not None:
             diagnostics.clear()
 
@@ -156,6 +182,7 @@ class LocalEditorialPlanner:
             return None
 
         stage = "invalid-story-overview"
+        candidate: object = None
         try:
             overview = _story_overview(full_script, capsule)
             payload = {
@@ -207,6 +234,7 @@ class LocalEditorialPlanner:
                 return None
             stage = "invalid-model-json"
             obj = json.loads(text)
+            candidate = obj
             stage = "invalid-intent"
             validated = SceneSearchIntent.from_mapping(
                 obj, scene_id=scene.scene_id, narration_text=scene.english_text,
@@ -232,8 +260,14 @@ class LocalEditorialPlanner:
                 result["scene_anchor"] = validated.scene_anchor
             return result
         except InvalidIntent as exc:
-            # InvalidIntent uses fixed machine codes; no model text is disclosed.
+            # Existing safe failure codes remain unchanged. A human explicitly
+            # requesting research diagnostics can inspect only bounded model-
+            # proposed fields, never the whole response or hidden thinking.
             mark("invalid-intent:" + str(exc))
+            if inspect_rejection and diagnostics is not None:
+                preview = _bounded_rejected_preview(candidate)
+                if preview:
+                    diagnostics["rejected_plan_preview"] = preview
             return None
         except urllib.error.HTTPError as exc:
             mark("http-error:" + str(exc.code))
