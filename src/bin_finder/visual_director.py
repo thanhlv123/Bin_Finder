@@ -148,16 +148,16 @@ class LocalVisualDirector:
             not isinstance(scenes, (list, tuple))
             or not 1 <= len(scenes) <= _MAX_SCENES
             or not all(isinstance(s, SceneRecord) for s in scenes)
-            or len("".join(s.english_text for s in scenes)) > _MAX_SCRIPT_CHARS
             or any(not isinstance(s.english_text, str) or not s.english_text.strip()
                    or len(s.english_text) > 1500 for s in scenes)
+            or sum(len(s.english_text) for s in scenes) > _MAX_SCRIPT_CHARS
             or not isinstance(plan_id, str) or not 1 <= len(plan_id) <= 100
             or not re.fullmatch(r"[a-zA-Z0-9_-]+", plan_id)
         ):
             mark("invalid-input")
             return None
-        if any(s.order != i or not s.scene_id or
-               s.scene_id != scenes[i - 1].scene_id
+        if any(type(s.order) is not int or s.order != i
+               or not isinstance(s.scene_id, str) or not s.scene_id
                for i, s in enumerate(scenes, 1)):
             mark("invalid-scene-order")
             return None
