@@ -153,14 +153,32 @@ def _bounded_rejected_preview(obj: object) -> dict[str, object]:
         value = obj.get(name)
         if isinstance(value, str) and len(value) <= limit:
             preview[name] = value
+    field_shapes: dict[str, str] = {}
     for name, limit, max_count in (
         ("queries", 160, 3), ("required_entities", 100, 6),
-        ("must_show", 150, 6),
+        ("must_show", 150, 6), ("must_not_show", 150, 6),
     ):
-        values = obj.get(name)
-        if (isinstance(values, list) and len(values) <= max_count
-                and all(isinstance(v, str) and len(v) <= limit for v in values)):
-            preview[name] = values
+        if name not in obj:
+            field_shapes[name] = "missing"
+            continue
+        values = obj[name]
+        if isinstance(values, list):
+            # Shape only; no secret/model text is included. Count is capped.
+            field_shapes[name] = (
+                f"list:{len(values)}" if len(values) <= 100 else "list:>100"
+            )
+            if (len(values) <= max_count
+                    and all(isinstance(v, str) and len(v) <= limit for v in values)):
+                preview[name] = values
+        elif values is None:
+            field_shapes[name] = "null"
+        elif isinstance(values, str):
+            field_shapes[name] = "string"
+        elif isinstance(values, dict):
+            field_shapes[name] = "object"
+        else:
+            field_shapes[name] = "other"
+    preview["field_shapes"] = field_shapes
     return preview
 
 
