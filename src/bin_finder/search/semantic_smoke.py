@@ -19,6 +19,10 @@ def main(argv=None) -> int:
         "--approve-local-planner", action="store_true",
         help="Explicitly authorize one text-only HTTP request to local Ollama.",
     )
+    parser.add_argument(
+        "--diagnose", action="store_true",
+        help="Print safe failure codes, token counts and response sizes (no model text).",
+    )
     args = parser.parse_args(argv)
     if not args.approve_local_planner:
         print("SKIPPED_ZB01_NOT_APPROVED")
@@ -29,7 +33,17 @@ def main(argv=None) -> int:
         context=SceneContext(keywords=("Lujiazui office lights",)),
     )
     legacy = build_scene_queries(scene, max_queries=3)
-    proposed = LocalEditorialPlanner().propose(scene, full_script=SCRIPT)
+    diagnostics: dict[str, object] = {}
+    planner = LocalEditorialPlanner()
+    if args.diagnose:
+        proposed = planner.propose(scene, full_script=SCRIPT, diagnostics=diagnostics)
+    else:
+        proposed = planner.propose(scene, full_script=SCRIPT)
+    if args.diagnose:
+        for key in ("reason", "done_reason", "prompt_eval_count", "eval_count",
+                    "thinking_present", "content_chars"):
+            if key in diagnostics:
+                print(f"ZB01_DIAGNOSTIC_{key.upper()}:", diagnostics[key])
     print("ZB01_BASELINE_QUERIES:", repr(legacy))
     if proposed is None:
         print("ZB01_FALLBACK: no valid local Ollama editorial result")
