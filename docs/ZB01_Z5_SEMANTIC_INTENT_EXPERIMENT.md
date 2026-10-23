@@ -1,52 +1,48 @@
 # ZB-01 — Z5-inspired editorial intent experiment
 
-**Status:** Experimental contract ONLY. No production search, GUI, provider, F021 VLM, F022, or model-calling logic is changed.
+Status: **Research-only**. The new producer is opt-in and is NOT wired into the normal Bin Finder search UI or provider pipeline.
 
-## Purpose
+## Evidence and scope
 
-Bin Finder's F018 scene planning and F002 query builder are conservative and largely lexical. Z5 prompt research suggests a useful separation between whole-story context, a visual goal for each semantic beat, and multiple editorial search angles. This experiment **independently implements only the bounded data contract** for future scene-level plans; it does not copy proprietary Z5 code or prompt text.
+Z5 research suggests separating whole-story context, scene meaning, visual constraints and multiple search queries. F018 currently has a conservative deterministic scene planner; F002 builds mostly lexical searches. ZB-01 independently implements a bounded contract and a local Ollama prototype. No Z5 source, binary code, or prompt wording is copied.
 
 ## Files
 
-- `src/bin_finder/search/semantic_intents.py`: immutable `StoryCapsule` and `SceneSearchIntent`, bounded validation, a pure opt-in query adapter.
-- `tests/test_zb01_semantic_intents.py`: offline tests for valid input, preservation of scene identity, fallback, unsupported named entities, query limits and invalid provenance.
+- src/bin_finder/search/semantic_intents.py: immutable StoryCapsule / SceneSearchIntent, validation, legacy fallback.
+- src/bin_finder/search/semantic_planner.py: opt-in LocalEditorialPlanner using explicit loopback-only Ollama /api/chat; no startup or production-discovery invocation.
+- tests/test_zb01_semantic_intents.py and tests/test_zb01_local_editorial_planner.py: offline tests for a fake model, invalid responses, URL restrictions and fallback.
 
-No new runtime dependencies.
+No additional dependencies. No production search, F021 verifier, GUI, acquisition, approval, session schema or model installation change.
 
-## Contract boundaries
+## Opt-in behavior
 
-An opt-in caller may pass a structured mapping containing:
+An experimental caller explicitly constructs LocalEditorialPlanner() and calls suggest_queries(scene, full_script=..., capsule=...). The result is a query list; it is **not automatically used for a real search**. Constructing the planner does not send a network request.
 
-- `scene_id`, `narration_text`: must exactly correspond to the requested scene.
-- `visual_goal`, `must_show`, `must_not_show`, `uncertainty`: editorial metadata for later evaluation; **currently not wired into ranking/VLM**.
-- `required_entities`: named terms present in the full script; every proposed query must retain them.
-- `queries`: one to three strings, max 160 characters each, no duplicates.
-- `provenance`: `script` or `editor_review`.
+Defaults: qwen3-vl:4b, http://127.0.0.1:11434, stream=false, format=json, num_ctx=8192, num_predict=4096, temperature=0. A thinking model may fail strict parsing: this will fall back to unchanged F002 queries. The tool does not pull or install models.
 
-`proposed_queries_for_scene(scene, proposed, full_script=..., max_queries=...)` returns these queries only when the mapping passes validation. Missing or malformed input returns the original `build_scene_queries` output; the scene object is not modified. No plan is loaded automatically and **there is no GUI toggle yet**.
+A valid StoryCapsule is optional for scripts no longer than 3000 characters. **Longer scripts require a capsule**: without one, the code fails safely without sending any Ollama request. Automatic full-story capsule creation is *not* implemented; silent truncation is avoided.
 
-Important: validation cannot prove factual accuracy of `visual_goal` or `must_show`. This is a contract/safety check, not semantic comprehension or stock-footage retrieval quality. A future planner will need bounded output, grounding tests, explicit opt-in and real-footage comparisons.
+## Contract and guards
 
-## Explicit non-goals
+SceneSearchIntent includes exact scene_id and narration_text, visual_goal, required_entities, must_show, must_not_show, 1–3 queries, uncertainty and provenance. Required named entities must appear in the full script and be retained in every query. Invalid/oversized outputs preserve F002 queries. These checks cannot establish semantic truth; an editor and real footage benchmark remain essential.
 
-- No modifications to PR #29 or its F021 Ollama verification path.
-- No downloads, API calls, AI model pulls, GUI changes, rights-status changes or auto-approval.
-- No blending of Storyblocks proprietary code or Z5 prompt wording into Bin Finder.
-- No automatic semantic claims derived from the narration yet.
+Only HTTP loopback endpoints allowed; no URLs with embedded credentials, redirects, system proxies, arbitrary response sizes or unlimited timeouts. No change to scene IDs, licenses or selected clips.
 
-## Acceptance gate before wiring into discovery
+## Validation
 
-1. Run this test file and existing F002/F018 tests on Windows Python 3.12.
-2. Review the 12 scenario fixtures in the ZB-01 research pack (they are editorial ground truth, **not measured provider results**).
-3. Add separately approved query-planner producer with validated, bounded JSON output and offline deterministic fallback. Do not wire the F021 vision verifier into query planning.
-4. Compare **legacy vs planned** queries using the same search providers and labeled footage: Recall@5, Precision@5, wrong-subject rate, NO_MATCH behavior, query latency and VLM cost.
-5. Proceed only if metrics support improvement without breaking stable scene IDs, clip duration, licensing, sessions or human approval. Otherwise keep the legacy path. Do not add more GitHub repos unless needed.
+- Commit f08e4a0: GitHub Actions Windows run 39921563276 PASS (Python 3.12 compile, full pytest, FFmpeg smokes, PyQt6 GUI).
+- New optional producer: mock tests passed in a standalone local Python harness; **the latest full GitHub Windows run must be inspected separately**.
+- No real Ollama query-generation accuracy test and no provider search benchmark yet.
 
-## Local validation
+Windows local test command (on the ZB-01 research branch; not F021):
 
-```powershell
-$env:PYTHONPATH = "src"
-python -m pytest -q tests/test_zb01_semantic_intents.py tests/test_query_builder_f002.py tests/test_scene_planning_f018.py
-```
+    $env:PYTHONPATH = "src"
+    python -m pytest -q tests/test_zb01_semantic_intents.py tests/test_zb01_local_editorial_planner.py tests/test_query_builder_f002.py tests/test_scene_planning_f018.py
 
-The experimental tests passed **11/11 in a standalone Python harness containing the matching Bin Finder scene/query contracts**; this is **not** a full repository CI or Windows result. Full repository/Windows validation is still pending.
+## Integration gates
+
+1. Full Windows CI and F002/F018 regression PASS.
+2. Separate real Ollama quality study with labeled scenes, negations, ambiguous entities and NO_MATCH.
+3. Compare baseline vs planned queries using identical provider searches and labeled clips: Recall@5, Precision@5, wrong-subject rate, NO_MATCH, latency and VLM cost.
+4. Wire behind an explicit opt-in flag only if evidence shows a benefit; preserve legacy fallback and human approval.
+5. Do not add GitHub repos unless Z5-first proves insufficient.
