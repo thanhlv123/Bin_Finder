@@ -101,11 +101,23 @@ class LocalEditorialPlanner:
         )
 
     def propose(self, scene, *, full_script: str,
-                capsule: StoryCapsule | None = None) -> Mapping[str, object] | None:
+                capsule: StoryCapsule | None = None,
+                diagnostics: dict[str, object] | None = None) -> Mapping[str, object] | None:
+        """Optional safe diagnostic metadata; never records generated text or input."""
+        if diagnostics is not None:
+            diagnostics.clear()
+
+        def mark(reason: str) -> None:
+            if diagnostics is not None:
+                diagnostics["reason"] = reason
+
         if (not isinstance(full_script, str) or not 0 < len(full_script) <= 50_000
                 or not isinstance(scene.english_text, str)
                 or not 0 < len(scene.english_text) <= 1500):
+            mark("invalid-input")
             return None
+
+        stage = "invalid-story-overview"
         try:
             overview = _story_overview(full_script, capsule)
             payload = {
@@ -126,18 +138,43 @@ class LocalEditorialPlanner:
                 data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                 headers={"Content-Type": "application/json"},
             )
+            stage = "transport-error"
             with self.opener.open(req, timeout=self.config.timeout_seconds) as response:
                 raw = response.read(MAX_RESPONSE + 1)
             if len(raw) > MAX_RESPONSE:
+                mark("oversized-envelope")
                 return None
-            text = json.loads(raw.decode("utf-8"))["message"]["content"]
-            if not isinstance(text, str) or len(text) > MAX_RESPONSE:
+            stage = "malformed-envelope"
+            envelope = json.loads(raw.decode("utf-8"))
+            if diagnostics is not None and isinstance(envelope, dict):
+                for key in ("done_reason", "prompt_eval_count", "eval_count"):
+                    item = envelope.get(key)
+                    if ((key == "done_reason" and isinstance(item, str) and len(item) <= 32)
+                            or (key != "done_reason" and type(item) is int and 0 <= item <= 10_000_000)):
+                        diagnostics[key] = item
+                message = envelope.get("message")
+                if isinstance(message, dict):
+                    diagnostics["thinking_present"] = bool(message.get("thinking"))
+            text = envelope["message"]["content"]
+            if not isinstance(text, str):
+                mark("non-text-content")
                 return None
+            if diagnostics is not None:
+                diagnostics["content_chars"] = min(len(text), MAX_RESPONSE + 1)
+            if not text.strip():
+                mark("empty-content")
+                return None
+            if len(text) > MAX_RESPONSE:
+                mark("oversized-content")
+                return None
+            stage = "invalid-model-json"
             obj = json.loads(text)
+            stage = "invalid-intent"
             validated = SceneSearchIntent.from_mapping(
                 obj, scene_id=scene.scene_id, narration_text=scene.english_text,
                 full_script=full_script,
             )
+            mark("valid")
             return {
                 "scene_id": validated.scene_id,
                 "narration_text": validated.narration_text,
@@ -149,8 +186,16 @@ class LocalEditorialPlanner:
                 "uncertainty": validated.uncertainty,
                 "provenance": validated.provenance,
             }
+        except InvalidIntent as exc:
+            # InvalidIntent uses fixed machine codes; no model text is disclosed.
+            mark("invalid-intent:" + str(exc))
+            return None
+        except urllib.error.HTTPError as exc:
+            mark("http-error:" + str(exc.code))
+            return None
         except (OSError, ValueError, KeyError, TypeError, UnicodeError,
-                urllib.error.URLError, InvalidIntent, EditorialPlannerError):
+                urllib.error.URLError, EditorialPlannerError):
+            mark(stage)
             return None
 
     def suggest_queries(self, scene, *, full_script: str,
