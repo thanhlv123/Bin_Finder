@@ -177,7 +177,7 @@ def test_invalid_model_and_token_options_rejected():
      "invalid-visual-plan:invalid-search-shot"),
     (lambda x: x["shots"][0].update(queries=["bad"] * 4),
      "invalid-visual-plan:invalid-shot-queries"),
-    (lambda x: x["shots"][2].update(hold_from_shot_id="not-real"),
+    (lambda x: x["shots"][1].update(hold_from_shot_id="not-real"),
      "invalid-visual-plan:invalid-hold-shot"),
 ])
 def test_bad_model_plan_is_rejected_without_fallback_or_output_leakage(modified, reason):
