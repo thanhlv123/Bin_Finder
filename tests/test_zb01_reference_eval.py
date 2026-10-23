@@ -157,3 +157,29 @@ def test_opt_in_rejection_preview_passes_only_selected_bounded_fields():
         "old classic car repair"
     ]
     assert result["planner_status"] == "invalid-intent:insufficient-scene-focus"
+
+
+
+def test_structured_schema_requires_explicit_approval(tmp_path, capsys):
+    path = tmp_path / "reference.json"
+    path.write_text(json.dumps(_reference()), encoding="utf-8")
+    assert target.main(["--reference", str(path), "--structured-output"]) == 2
+    assert "schema-requires-local-planner-approval" in capsys.readouterr().out
+
+
+def test_structured_schema_config_is_only_used_for_approved_local_model(monkeypatch):
+    captured = []
+    class DummyPlanner:
+        def __init__(self, config):
+            captured.append(config)
+        def propose(self, scene, *, full_script, diagnostics):
+            diagnostics["reason"] = "invalid-intent:missing-queries"
+            return None
+    monkeypatch.setattr(target, "LocalEditorialPlanner", DummyPlanner)
+    result = target.evaluate_reference(
+        _reference()["beats"], start=15, count=1,
+        approve_local_planner=True, structured_output=True,
+    )
+    assert len(captured) == 1
+    assert captured[0].structured_output is True
+    assert result[0]["used_legacy_fallback"] is True
