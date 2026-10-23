@@ -133,6 +133,11 @@ def evaluate_reference(
             record["model_must_show"] = proposed["must_show"] if proposed else []
             record["model_must_not_show"] = proposed["must_not_show"] if proposed else []
             record["model_uncertainty"] = proposed["uncertainty"] if proposed else ""
+            record["model_evidence_type"] = proposed.get("evidence_type", "unknown") if proposed else "unknown"
+            record["model_scene_anchor"] = proposed.get("scene_anchor", "") if proposed else ""
+            record["planner_no_match"] = bool(
+                proposed is not None and proposed.get("evidence_type") == "no_match"
+            )
         else:
             record["planner_status"] = "NOT_RUN_NO_APPROVAL"
         results.append(record)
