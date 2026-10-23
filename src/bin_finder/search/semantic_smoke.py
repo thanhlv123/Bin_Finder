@@ -56,6 +56,8 @@ def main(argv=None) -> int:
         print("ZB01_FALLBACK: no valid local Ollama editorial result")
         return 2
     print("ZB01_PROPOSED_QUERIES:", repr(proposed["queries"]))
+    print("ZB01_EVIDENCE_TYPE:", str(proposed.get("evidence_type", "unknown")))
+    print("ZB01_SCENE_ANCHOR:", repr(proposed.get("scene_anchor", "")))
     print("ZB01_MUST_SHOW:", repr(proposed["must_show"]))
     print("ZB01_MUST_NOT_SHOW:", repr(proposed["must_not_show"]))
     print("ZB01_UNCERTAINTY:", str(proposed["uncertainty"]))
