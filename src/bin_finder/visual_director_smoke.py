@@ -10,6 +10,7 @@ import json
 
 from bin_finder.models import SceneRecord
 from bin_finder.visual_director import LocalVisualDirector
+from bin_finder.visual_plan_audit import audit_visual_story_plan
 from bin_finder.visual_planning import parse_visual_story_plan
 
 SYNTHETIC_GENRES: dict[str, tuple[str, ...]] = {
@@ -134,6 +135,9 @@ def main(argv: list[str] | None = None) -> int:
     print("ZB02_BLOCKS:", len(plan.blocks))
     print("ZB02_SHOTS:", len(plan.shots))
     print("ZB02_SEARCH_REQUESTS:", len(plan.search_requests()))
+    print("ZB02_AUDIT:", json.dumps(
+        audit_visual_story_plan(plan, scenes).to_mapping(), ensure_ascii=False
+    ))
     print("ZB02_PLAN:", json.dumps(plan.to_mapping(), ensure_ascii=False))
     print("ZB02_RESEARCH_ONLY: no footage/provider/GUI or timing operations")
     return 0
