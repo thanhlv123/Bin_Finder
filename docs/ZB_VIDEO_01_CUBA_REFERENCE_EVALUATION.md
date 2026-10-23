@@ -107,3 +107,21 @@ $json = Join-Path $HOME 'Downloads\cuba_script_footage_benchmark.json'
 `--inspect-rejected` is rejected unless the user *also* explicitly approves a local Ollama request. By default failed candidates remain redacted. The additional `planner_diagnostics.rejected_plan_preview` includes only bounded model-generated `scene_anchor`, `queries`, `required_entities`, `evidence_type`, `visual_goal`, `uncertainty` and `must_show`, if those fields were sufficiently small and well typed. It **never** includes raw Ollama output, the source narration field, complete story, provider credentials or hidden model thinking. Printed debug output stays local unless the user independently chooses to share it.
 
 The accepted CUBA-14 query must still be manually judged as illustrative, not as a claim that a stock shot can prove export prices. No provider lookup, visual evidence, or retrieval effectiveness has yet been measured.
+
+
+## 15-beat local V3 results and observational-quality gap
+
+User-held private benchmark results from Windows localhost Instruct (no stock provider):
+- **11/15 validated plans** (73.3%), **4/15 legacy fallback** (26.7%), **0 valid no_match**.
+- Fallback IDs: 05 (`missing-queries`), 09/10 (`query-lost-scene-focus`), 15 (`invalid-list`).
+- Review flags on structurally valid plans: unobservable audio or emotion, incorrect `direct` evidence on a metaphor, searching unrelated visual concepts in the **same shot**, gratuitous negative filters, and assertions about outage duration/export prices not visually provable.
+- Particularly solid subject/action identification: vintage car and repairs, with remaining action-level shot selection improvements needed.
+
+The changes below are **prompt/harness research**, NOT a claimed footage-accuracy improvement:
+- Ask for visible performers/instruments instead of sound seen through a window, visible streets instead of nostalgia as proof, and avoid visually "proving" exact outages/prices/wages.
+- Split independent subjects in a compound narration beat across separate queries instead of demanding they appear in the same frame.
+- Allow a place-identification beat to request a contextual establishing shot; encourage explicit `no_match` for an abstract bridge without a reliable visual.
+- Enforce empty `must_not_show` for no_match and keep the existing per-scene grounding guard (do not loosen to silence fallback).
+- When the user explicitly opts into `--inspect-rejected`, include `planner_diagnostics.rejected_plan_preview.field_shapes` to reveal **only** the JSON type and bounded array length for `queries/required_entities/must_show/must_not_show`. No failed model raw payload, story text or thinking.
+
+**New live evaluation required:** rerun representative scenes 03, 05, 07, 09, 10, 13 and 15, alongside the known risk scene 14, using exactly the same private local JSON. Judge visual observability and editorial evidence, not merely `valid`. Do not integrate into production or start footage acquisition unless quality evidence supports it.
