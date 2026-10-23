@@ -20,6 +20,46 @@ from bin_finder.search.semantic_intents import (
 MAX_RESPONSE = 65_536
 MODEL_NAME = re.compile(r"[A-Za-z0-9._:/-]{1,100}\Z")
 
+# Optional, research-only Ollama format contract; validation below remains
+# authoritative. No model download and no additional runtime dependency.
+def _str_field(max_length: int) -> dict[str, object]:
+    return {"type": "string", "maxLength": max_length}
+
+
+def _array_field(max_items: int, max_length: int) -> dict[str, object]:
+    return {
+        "type": "array", "maxItems": max_items,
+        "items": _str_field(max_length),
+    }
+
+
+EDITORIAL_JSON_SCHEMA: dict[str, object] = {
+    "type": "object",
+    "properties": {
+        "scene_id": _str_field(100),
+        "narration_text": _str_field(1500),
+        "scene_anchor": _str_field(160),
+        "evidence_type": {
+            "type": "string",
+            "enum": ["direct", "contextual", "editorial_metaphor",
+                     "weak_indirect", "no_match"],
+        },
+        "visual_goal": _str_field(300),
+        "required_entities": _array_field(6, 100),
+        "must_show": _array_field(6, 150),
+        "must_not_show": _array_field(6, 150),
+        "queries": _array_field(3, 160),
+        "uncertainty": _str_field(300),
+        "provenance": {"type": "string", "enum": ["script"]},
+    },
+    "required": [
+        "scene_id", "narration_text", "scene_anchor", "evidence_type",
+        "visual_goal", "required_entities", "must_show", "must_not_show",
+        "queries", "uncertainty", "provenance",
+    ],
+    "additionalProperties": False,
+}
+
 
 class EditorialPlannerError(ValueError):
     """Invalid local planner configuration."""
@@ -39,6 +79,7 @@ class OllamaEditorialConfig:
     timeout_seconds: float = 120.0
     num_ctx: int = 8192
     num_predict: int = 4096
+    structured_output: bool = False  # experimental opt-in, default unchanged
 
     def validate(self) -> str:
         try:
@@ -59,6 +100,8 @@ class OllamaEditorialConfig:
                 or not 2048 <= self.num_ctx <= 32768
                 or not 128 <= self.num_predict < self.num_ctx):
             raise EditorialPlannerError("invalid-token-budget")
+        if type(self.structured_output) is not bool:
+            raise EditorialPlannerError("invalid-structured-output")
         safe_host = "[::1]" if host == "::1" else host
         return f"http://{safe_host}" + (f":{port}" if port is not None else "")
 
@@ -228,7 +271,8 @@ class LocalEditorialPlanner:
         try:
             overview = _story_overview(full_script, capsule)
             payload = {
-                "model": self.config.model, "stream": False, "format": "json",
+                "model": self.config.model, "stream": False,
+                "format": (EDITORIAL_JSON_SCHEMA if self.config.structured_output else "json"),
                 "options": {"temperature": 0, "num_ctx": self.config.num_ctx,
                             "num_predict": self.config.num_predict},
                 "messages": [
