@@ -233,3 +233,71 @@ def test_prompt_protects_current_scene_not_previous_motif():
     assert "no_match" in SYSTEM_RULES
     assert "scene_anchor" in SYSTEM_RULES
     assert "must_not_show" in SYSTEM_RULES
+
+
+def test_scene_anchor_can_omit_filler_words_but_not_add_new_subjects():
+    narration = "These machines have been repaired and patched up for decades."
+    plan = _plan(
+        "CUBA-12", narration,
+        anchor="machines repaired patched",
+        evidence="direct",
+        queries=["Old machines being repaired and patched"],
+    )
+    result = SceneSearchIntent.from_mapping(
+        plan, scene_id="CUBA-12", narration_text=narration, full_script=narration,
+    )
+    assert result.scene_anchor == "machines repaired patched"
+    forged = {**plan, "scene_anchor": "Chevrolets repaired patched"}
+    with pytest.raises(InvalidIntent, match="scene-anchor-not-in-narration"):
+        SceneSearchIntent.from_mapping(
+            forged, scene_id="CUBA-12", narration_text=narration,
+            full_script="Chevrolets are common here. " + narration,
+        )
+
+
+def test_named_entity_normalization_is_bounded_and_requires_each_query():
+    narration = "Chevrolets from the 1950s drive through Cuba beside colonial buildings."
+    plan = _plan(
+        "CUBA-02", narration,
+        anchor="Chevrolets from the 1950s drive",
+        evidence="direct",
+        queries=[
+            "1950 Chevrolet moving along Cuba colonial street",
+            "Cuban 1950s Chevrolet driving through Havana",
+        ],
+    )
+    plan["required_entities"] = ["Chevrolets", "Cuba"]
+    result = SceneSearchIntent.from_mapping(
+        plan, scene_id="CUBA-02", narration_text=narration,
+        full_script=narration,
+    )
+    assert result.required_entities == ("Chevrolets", "Cuba")
+    wrong = {**plan, "queries": [
+        "1950 Chevrolet moving through Cuba",
+        "1950 Chevrolet moving through Madrid",
+    ]}
+    with pytest.raises(InvalidIntent, match="required-entity-lost"):
+        SceneSearchIntent.from_mapping(
+            wrong, scene_id="CUBA-02", narration_text=narration,
+            full_script=narration,
+        )
+
+
+def test_scene_14_cannot_hide_drift_behind_single_country_anchor():
+    narration = "Cuban products are sold for high prices abroad."
+    bad = _plan(
+        "CUBA-14", narration, anchor="Cuban",
+        evidence="weak_indirect",
+        queries=["Cuba classic cars in front of colonial buildings"],
+    )
+    with pytest.raises(InvalidIntent, match="weak-scene-anchor"):
+        SceneSearchIntent.from_mapping(
+            bad, scene_id="CUBA-14", narration_text=narration,
+            full_script="Vintage cars are famous in Cuba. " + narration,
+        )
+    bad["scene_anchor"] = "Cuban products sold"
+    with pytest.raises(InvalidIntent, match="scene-focus"):
+        SceneSearchIntent.from_mapping(
+            bad, scene_id="CUBA-14", narration_text=narration,
+            full_script="Vintage cars are famous in Cuba. " + narration,
+        )
