@@ -120,3 +120,39 @@ def test_limit_is_bounded_and_empty_script_never_calls_model():
         OllamaEditorialConfig(num_ctx=1024).validate()
     with pytest.raises(EditorialPlannerError):
         OllamaEditorialConfig(model="model with spaces").validate()
+
+
+def test_diagnostics_identify_thinking_token_exhaustion_without_exposing_text():
+    envelope = {
+        "message": {"content": "", "thinking": "PRIVATE REASONING"},
+        "done_reason": "length", "prompt_eval_count": 240,
+        "eval_count": 4096,
+    }
+    diagnostics = {"old_key": "must-clear"}
+    planner = LocalEditorialPlanner(opener=FakeOpener(envelope, raw=True))
+    assert planner.propose(scene(), full_script=SCRIPT, diagnostics=diagnostics) is None
+    assert diagnostics == {
+        "done_reason": "length", "prompt_eval_count": 240,
+        "eval_count": 4096, "thinking_present": True,
+        "content_chars": 0, "reason": "empty-content",
+    }
+    assert "PRIVATE REASONING" not in repr(diagnostics)
+
+
+def test_diagnostics_identify_schema_rejection():
+    bad = valid_plan()
+    bad["required_entities"] = ["Beijing"]
+    diagnostics = {}
+    planner = LocalEditorialPlanner(opener=FakeOpener(bad))
+    assert planner.propose(scene(), full_script=SCRIPT, diagnostics=diagnostics) is None
+    assert diagnostics["reason"] == "invalid-intent:unsupported-required-entity"
+    assert diagnostics["content_chars"] > 0
+
+
+def test_diagnostics_report_valid_response_without_model_content():
+    diagnostics = {}
+    planner = LocalEditorialPlanner(opener=FakeOpener(valid_plan()))
+    result = planner.propose(scene(), full_script=SCRIPT, diagnostics=diagnostics)
+    assert result["queries"] == valid_plan()["queries"]
+    assert diagnostics["reason"] == "valid"
+    assert "Lujiazui office towers night" not in repr(diagnostics)
