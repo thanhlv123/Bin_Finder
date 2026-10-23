@@ -86,3 +86,24 @@ Subsequent isolated revisions:
 - Add synthetic tests proving CUBA-14's earlier vintage-car motif is still rejected; CUBA-12's "machines repaired patched" anchor can pass; entity variants must be retained within every search.
 
 The local three-beat Ollama rerun is still required after Windows CI, because structurally valid JSON and synthetic tests are not proof of semantic relevance. No automatic retry, online search, GUI change, F021 change, or merge to main.
+
+
+## V2 evaluation: isolate the CUBA-12 rejection
+
+The second local three-scene evaluation (commit `f2e3ffb`) completed with:
+- CUBA-02: `valid`, `direct`, vintage Chevrolet / colonial architecture query.
+- CUBA-12: `invalid-intent:insufficient-scene-focus` and legacy fallback; **the rejected model query was not recorded**, so semantic quality cannot yet be judged.
+- CUBA-14: `valid`, `weak_indirect`, Cuban goods in international markets. This stopped the vintage-car context drift, but visuals/price labels alone cannot validate export-price claims.
+
+**Do not relax the scene-focus validator without seeing the actual rejected CUBA-12 search.** A bounded opt-in inspector was added to `reference_eval`:
+
+```powershell
+$env:PYTHONPATH = 'D:\YouTubeTools\Bin_Finder_ZB01_Research\src'
+$python = 'D:\YouTubeTools\Bin_Finder\Bin_Finder\.venv\Scripts\python.exe'
+$json = Join-Path $HOME 'Downloads\cuba_script_footage_benchmark.json'
+& $python -m bin_finder.search.reference_eval --reference $json --start 12 --count 1 --approve-local-planner --inspect-rejected
+```
+
+`--inspect-rejected` is rejected unless the user *also* explicitly approves a local Ollama request. By default failed candidates remain redacted. The additional `planner_diagnostics.rejected_plan_preview` includes only bounded model-generated `scene_anchor`, `queries`, `required_entities`, `evidence_type`, `visual_goal`, `uncertainty` and `must_show`, if those fields were sufficiently small and well typed. It **never** includes raw Ollama output, the source narration field, complete story, provider credentials or hidden model thinking. Printed debug output stays local unless the user independently chooses to share it.
+
+The accepted CUBA-14 query must still be manually judged as illustrative, not as a claim that a stock shot can prove export prices. No provider lookup, visual evidence, or retrieval effectiveness has yet been measured.
