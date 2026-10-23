@@ -5,7 +5,7 @@ import argparse
 
 from bin_finder.models import SceneContext, SceneRecord
 from bin_finder.search.query_builder import build_scene_queries
-from bin_finder.search.semantic_planner import LocalEditorialPlanner
+from bin_finder.search.semantic_planner import LocalEditorialPlanner, OllamaEditorialConfig
 
 SCRIPT = (
     "At ten at night, office lights still glow in Lujiazui, Shanghai. "
@@ -23,6 +23,10 @@ def main(argv=None) -> int:
         "--diagnose", action="store_true",
         help="Print safe failure codes, token counts and response sizes (no model text).",
     )
+    parser.add_argument(
+        "--model", default=None,
+        help="Optional explicit locally installed Ollama model tag; default is the Instruct variant.",
+    )
     args = parser.parse_args(argv)
     if not args.approve_local_planner:
         print("SKIPPED_ZB01_NOT_APPROVED")
@@ -34,7 +38,10 @@ def main(argv=None) -> int:
     )
     legacy = build_scene_queries(scene, max_queries=3)
     diagnostics: dict[str, object] = {}
-    planner = LocalEditorialPlanner()
+    model_name = args.model or OllamaEditorialConfig().model
+    print("ZB01_PLANNER_MODEL:", model_name)
+    planner = (LocalEditorialPlanner() if args.model is None
+               else LocalEditorialPlanner(OllamaEditorialConfig(model=args.model)))
     if args.diagnose:
         proposed = planner.propose(scene, full_script=SCRIPT, diagnostics=diagnostics)
     else:
