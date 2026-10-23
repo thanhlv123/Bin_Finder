@@ -67,6 +67,7 @@ def test_query_producer_fake_local_request_and_validation():
     assert req.full_url == "http://127.0.0.1:11434/api/chat"
     assert req.get_method() == "POST" and timeout == 120
     assert json.loads(req.data)["messages"][1]["role"] == "user"
+    assert json.loads(req.data)["model"] == "qwen3-vl:4b-instruct"
 
 
 @pytest.mark.parametrize("url", [
@@ -156,3 +157,11 @@ def test_diagnostics_report_valid_response_without_model_content():
     assert result["queries"] == valid_plan()["queries"]
     assert diagnostics["reason"] == "valid"
     assert "Lujiazui office towers night" not in repr(diagnostics)
+
+
+def test_query_planner_model_is_independent_of_f021_vlm_default():
+    from bin_finder.verification.ollama_vlm import DEFAULT_MODEL
+
+    assert OllamaEditorialConfig().model == "qwen3-vl:4b-instruct"
+    assert DEFAULT_MODEL == "qwen3-vl:4b"
+    assert OllamaEditorialConfig(model="qwen3-vl:4b-instruct").validate().startswith("http://")
