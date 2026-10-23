@@ -227,3 +227,41 @@ def test_rejected_field_shapes_expose_only_type_not_content():
     assert "must_show" not in (
         k for k in preview if k != "field_shapes"
     )
+
+
+
+def test_schema_opt_in_bounds_output_but_default_stays_json():
+    from bin_finder.search.semantic_planner import EDITORIAL_JSON_SCHEMA
+
+    fake_default = FakeOpener(valid_plan())
+    default_planner = LocalEditorialPlanner(opener=fake_default)
+    assert default_planner.suggest_queries(scene(), full_script=SCRIPT) == valid_plan()["queries"]
+    req, _ = fake_default.calls[0]
+    assert json.loads(req.data)["format"] == "json"
+
+    fake_schema = FakeOpener(valid_plan())
+    planner = LocalEditorialPlanner(
+        OllamaEditorialConfig(structured_output=True), opener=fake_schema,
+    )
+    assert planner.suggest_queries(scene(), full_script=SCRIPT) == valid_plan()["queries"]
+    req, _ = fake_schema.calls[0]
+    payload = json.loads(req.data)
+    assert payload["format"] == EDITORIAL_JSON_SCHEMA
+    assert payload["format"]["properties"]["queries"]["maxItems"] == 3
+    assert payload["format"]["properties"]["must_show"]["maxItems"] == 6
+    assert payload["format"]["properties"]["evidence_type"]["enum"][-1] == "no_match"
+    assert payload["stream"] is False
+
+    with pytest.raises(EditorialPlannerError, match="invalid-structured-output"):
+        OllamaEditorialConfig(structured_output="True").validate()
+
+
+def test_schema_mode_keeps_local_validator_and_fallback():
+    bad = valid_plan()
+    bad["queries"] = ["Lujiazui" for _ in range(4)]
+    fake = FakeOpener(bad)
+    planner = LocalEditorialPlanner(
+        OllamaEditorialConfig(structured_output=True), opener=fake,
+    )
+    assert planner.suggest_queries(scene(), full_script=SCRIPT) == build_scene_queries(scene())
+    assert len(fake.calls) == 1
