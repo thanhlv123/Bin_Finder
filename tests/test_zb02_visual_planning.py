@@ -187,3 +187,17 @@ def test_semantic_truth_is_not_implied_by_valid_structure():
     assert parse_visual_story_plan(draft, scenes()).shots[0].visual_goal == (
         "An unverifiable and misleading claim"
     )
+
+
+
+def test_first_shot_needs_an_actual_search_or_graphic_visual():
+    draft = base_plan()
+    draft["shots"][0] = {
+        "shot_id": "s1", "block_id": "b1",
+        "scene_ids": ["scene_001", "scene_002"],
+        "strategy": "transition", "evidence_type": "not_applicable",
+        "visual_goal": "Transition without a prior visible image",
+        "queries": [], "hold_from_shot_id": None,
+    }
+    with pytest.raises(VisualPlanningError, match="missing-opening-visual"):
+        parse_visual_story_plan(draft, scenes())
