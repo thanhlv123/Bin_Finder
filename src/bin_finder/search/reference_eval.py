@@ -88,6 +88,7 @@ def evaluate_reference(
     beats: list[dict], *, start: int = 1, count: int = 1,
     approve_local_planner: bool = False, model: str | None = None,
     planner=None, inspect_rejection: bool = False,
+    structured_output: bool = False,
 ) -> list[dict]:
     if (not 1 <= start <= len(beats)
             or not 1 <= count <= 15 or start - 1 + count > len(beats)):
@@ -99,13 +100,16 @@ def evaluate_reference(
         raise ReferenceError("script-overview-limit")
     if approve_local_planner and planner is None:
         config = OllamaEditorialConfig(
-            model=model if model is not None else OllamaEditorialConfig().model
+            model=model if model is not None else OllamaEditorialConfig().model,
+            structured_output=structured_output,
         )
         planner = LocalEditorialPlanner(config)
     if not approve_local_planner and planner is not None:
         raise ReferenceError("planner-not-approved")
     if inspect_rejection and not approve_local_planner:
         raise ReferenceError("inspection-requires-local-planner-approval")
+    if structured_output and not approve_local_planner:
+        raise ReferenceError("schema-requires-local-planner-approval")
 
     results = []
     for n in range(start - 1, start - 1 + count):
@@ -157,6 +161,8 @@ def main(argv=None) -> int:
                         help="Opt in to one localhost Ollama request per selected beat")
     parser.add_argument("--model", type=str, default=None,
                         help="Optional preinstalled local Ollama model tag")
+    parser.add_argument("--structured-output", action="store_true",
+                        help="Opt in to Ollama JSON Schema constraints (default JSON mode)")
     parser.add_argument("--inspect-rejected", action="store_true",
                         help="Opt in to bounded, locally printed rejected model plan fields; "
                              "never includes whole script or model thinking")
@@ -167,6 +173,7 @@ def main(argv=None) -> int:
             beats, start=args.start, count=args.count,
             approve_local_planner=args.approve_local_planner, model=args.model,
             inspect_rejection=args.inspect_rejected,
+            structured_output=args.structured_output,
         )
     except (ReferenceError, ValueError) as exc:
         print("ZB_VIDEO_ERROR:", str(exc))
