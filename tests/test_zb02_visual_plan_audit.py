@@ -10,7 +10,10 @@ from bin_finder.visual_planning import VisualPlanningError, parse_visual_story_p
 
 def test_travel_transition_only_scene_is_pending_scheduling():
     scenes = synthetic_scenes("travel")
-    plan = parse_visual_story_plan(editorial_example("travel"), scenes)
+    draft = editorial_example("travel")
+    # A model may create a transition-only scene followed by a new shot.
+    draft["shots"][2]["scene_ids"] = ["scene_004"]
+    plan = parse_visual_story_plan(draft, scenes)
     original = plan.to_mapping()
     audit = audit_visual_story_plan(plan, scenes)
     assert audit.scene_count == 4
@@ -89,7 +92,7 @@ def test_multi_shots_on_one_scene_counted_not_penalized():
     })
     plan = parse_visual_story_plan(draft, scenes)
     audit = audit_visual_story_plan(plan, scenes)
-    assert audit.scenes_with_multiple_shots == 1
+    assert audit.scenes_with_multiple_shots == 2
     assert audit.search_count == 3
     assert all(flag.code != "excessive-shots" for flag in audit.flags)
 
@@ -106,7 +109,9 @@ def test_malformed_or_forged_plan_does_not_produce_audit():
 
 def test_audit_mapping_has_only_ids_codes_and_counts_not_private_narration():
     scenes = synthetic_scenes("travel")
-    plan = parse_visual_story_plan(editorial_example("travel"), scenes)
+    draft = editorial_example("travel")
+    draft["shots"][2]["scene_ids"] = ["scene_004"]
+    plan = parse_visual_story_plan(draft, scenes)
     output = audit_visual_story_plan(plan, scenes).to_mapping()
     assert output["flags"][0] == {
         "code": "transition-only-visual-coverage-unresolved",
@@ -115,3 +120,14 @@ def test_audit_mapping_has_only_ids_codes_and_counts_not_private_narration():
     }
     assert "Fishing boats return" not in repr(output)
     assert "visual_goal" not in repr(output)
+
+
+def test_transition_with_overlapping_real_visual_is_not_flagged():
+    scenes = synthetic_scenes("travel")
+    # The offline example deliberately covers scene_003 with a new search
+    # as well as a transition. Unlike the actual user model result, this
+    # structure does not have a transition-only narration scene.
+    plan = parse_visual_story_plan(editorial_example("travel"), scenes)
+    audit = audit_visual_story_plan(plan, scenes)
+    assert audit.scenes_with_multiple_shots == 1
+    assert audit.flags == ()
