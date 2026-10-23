@@ -44,3 +44,32 @@ The reference CSV/JSON intentionally includes low-strength matches and examples 
 ## Non-goals
 
 No GUI changes, no source downloads, no YouTube crawling, no new providers, no modifications to F021 PR #29, no new dependencies, and no merge to main.
+
+
+## ZB-01 scene-first revision (research only)
+
+The local Ollama prompt now makes the current narration beat authoritative; previous story context can clarify pronouns/references but must not introduce unrelated earlier motifs. New-style outputs include:
+- `scene_anchor`: an exact quoted phrase from the **current beat's narration_text**, preferably naming subject and action;
+- `evidence_type`: `direct | contextual | editorial_metaphor | weak_indirect | no_match`;
+- `queries`: 1–3 grounded queries, or an **empty** list only for a valid, reasoned `no_match`;
+- `uncertainty`: explains why an illustrative scene does not establish an economic/statistical claim.
+
+The validator checks verbatim scene anchoring and a **minimal lexical** overlap from the chosen scene anchor across proposed searches. This detects obvious topic drift, not semantic correctness. Plausible synonyms may be rejected and trigger unchanged F002 fallback. A valid `no_match` results in `planner_queries=[]`, `planner_no_match=true` and `used_legacy_fallback=false`; it must not be confused with invalid output fallback. The research CLI now reports `model_evidence_type` and `model_scene_anchor`.
+
+Existing editor plans without `evidence_type` remain supported for regression compatibility; only new-style proposals enforce the stronger contract. The model prompt requests the new style by default. **No behavior is wired into production.**
+
+### Three-beat local rerun before testing all 15
+
+On a clean, updated isolated research worktree, with private reference JSON available locally and the Instruct tag already installed:
+
+```powershell
+$env:PYTHONPATH = 'D:\YouTubeTools\Bin_Finder_ZB01_Research\src'
+$python = 'D:\YouTubeTools\Bin_Finder\Bin_Finder\.venv\Scripts\python.exe'
+$json = Join-Path $HOME 'Downloads\cuba_script_footage_benchmark.json'
+foreach ($index in @(2,12,14)) {
+    & $python -m bin_finder.search.reference_eval --reference $json --start $index --count 1 --approve-local-planner
+    if ($LASTEXITCODE -ne 0) { throw "Failed to evaluate scene $index" }
+}
+```
+
+Do **not** evaluate all 15 until the three local results are manually assessed for topic relevance, evidence truthfulness and invalid/NO_MATCH/fallback disposition. The runner never requests reference expected queries or image annotations from Ollama. No real stock footage has been searched or scored.
