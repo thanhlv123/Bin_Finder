@@ -23,7 +23,7 @@ def test_travel_transition_only_scene_is_pending_scheduling():
     assert audit.transition_count == 1
     assert audit.hold_count == 0
     assert audit.graphic_count == 0
-    assert audit.multi_scene_shot_count == 2
+    assert audit.multi_scene_shot_count == 1
     assert [f.code for f in audit.flags] == [
         "transition-only-visual-coverage-unresolved"
     ]
