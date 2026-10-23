@@ -63,6 +63,10 @@ def _validate_scene_focus(anchor: str, narration: str, queries: tuple[str, ...])
     focused = _focus_terms(anchor)
     if not focused:
         raise InvalidIntent("empty-scene-focus")
+    # Explicit valid abstention has no searches to ground. Still validate its
+    # anchor against the actual current narration.
+    if not queries:
+        return
     all_matched: set[str] = set()
     for query in queries:
         overlap = focused.intersection(_focus_terms(query))
