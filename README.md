@@ -18,6 +18,7 @@ Bin Finder is a Windows-local desktop application for discovering, analyzing, re
 - **F015 final footage export library:** PASS (offline + real FFmpeg smoke)
 - **F016 session persistence / recovery:** PASS (Windows CI 407 passed, 0 skipped + real FFmpeg restore/export smoke)
 - **F017 stable handoff contract / portable package:** PASS (Windows CI + real FFmpeg handoff acceptance: run #157, 471 passed, 0 skipped)
+- **F021 real VLM verification:** implemented, offline + live pipeline smoke PASS (qwen3-vl:4b); real-footage accuracy NOT validated (Windows CI pending)
 - **F020 portable handoff GUI:** implemented, local acceptance PASS (Windows CI pending)
 - **F019 long-form acceptance policy:** implemented, local acceptance PASS (Windows CI pending)
 - **F018 production scene planning / context enrichment:** implemented, local acceptance PASS (Windows CI pending)
@@ -181,5 +182,12 @@ default, which makes a normal GUI export write `_bin_finder_handoff.json`
 `ai_video_editor_bin_finder_adapter_v1` option remains separate and independent.
 AI_Video_Editor consumer integration is not implemented. See
 [F020 details](docs/F020_PORTABLE_HANDOFF_GUI.md).
+
+F021 real VLM verification: the production workflow now verifies actual video frames with
+an optional local Ollama vision model (default `qwen3-vl:4b`, loopback only, stdlib HTTP, FFmpeg
+frame sampling), per-unit falling back to the heuristic verifier when Ollama, the model, FFmpeg
+or the response is unavailable. F005 remains the provider contract, F018 the text fallback, and
+F014 human approval is still required. No cloud upload, no model auto-install, no new dependency.
+The live pipeline smoke passed against local `qwen3-vl:4b`; accuracy on real footage has not been validated. See [F021 details](docs/F021_REAL_VLM_VERIFICATION.md).
 
 See `docs/ROADMAP.md` for the milestone plan.
