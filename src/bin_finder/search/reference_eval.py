@@ -87,7 +87,7 @@ def _scene(beat: dict, order: int) -> SceneRecord:
 def evaluate_reference(
     beats: list[dict], *, start: int = 1, count: int = 1,
     approve_local_planner: bool = False, model: str | None = None,
-    planner=None,
+    planner=None, inspect_rejection: bool = False,
 ) -> list[dict]:
     if (not 1 <= start <= len(beats)
             or not 1 <= count <= 15 or start - 1 + count > len(beats)):
@@ -104,6 +104,8 @@ def evaluate_reference(
         planner = LocalEditorialPlanner(config)
     if not approve_local_planner and planner is not None:
         raise ReferenceError("planner-not-approved")
+    if inspect_rejection and not approve_local_planner:
+        raise ReferenceError("inspection-requires-local-planner-approval")
 
     results = []
     for n in range(start - 1, start - 1 + count):
@@ -122,9 +124,10 @@ def evaluate_reference(
         }
         if approve_local_planner:
             diagnostics: dict[str, object] = {}
-            proposed = planner.propose(
-                scene, full_script=full_script, diagnostics=diagnostics
-            )
+            kwargs = {"full_script": full_script, "diagnostics": diagnostics}
+            if inspect_rejection:
+                kwargs["inspect_rejection"] = True
+            proposed = planner.propose(scene, **kwargs)
             record["planner_status"] = diagnostics.get("reason", "unknown")
             record["planner_diagnostics"] = diagnostics
             record["planner_queries"] = proposed["queries"] if proposed else baseline
@@ -154,12 +157,16 @@ def main(argv=None) -> int:
                         help="Opt in to one localhost Ollama request per selected beat")
     parser.add_argument("--model", type=str, default=None,
                         help="Optional preinstalled local Ollama model tag")
+    parser.add_argument("--inspect-rejected", action="store_true",
+                        help="Opt in to bounded, locally printed rejected model plan fields; "
+                             "never includes whole script or model thinking")
     args = parser.parse_args(argv)
     try:
         beats = load_reference(args.reference)
         results = evaluate_reference(
             beats, start=args.start, count=args.count,
             approve_local_planner=args.approve_local_planner, model=args.model,
+            inspect_rejection=args.inspect_rejected,
         )
     except (ReferenceError, ValueError) as exc:
         print("ZB_VIDEO_ERROR:", str(exc))
