@@ -1,0 +1,94 @@
+# ZB-01 — Z5-inspired editorial intent experiment
+
+Status: **Research-only**. The new producer is opt-in and is NOT wired into the normal Bin Finder search UI or provider pipeline.
+
+## Evidence and scope
+
+Z5 research suggests separating whole-story context, scene meaning, visual constraints and multiple search queries. F018 currently has a conservative deterministic scene planner; F002 builds mostly lexical searches. ZB-01 independently implements a bounded contract and a local Ollama prototype. No Z5 source, binary code, or prompt wording is copied.
+
+## Files
+
+- src/bin_finder/search/semantic_intents.py: immutable StoryCapsule / SceneSearchIntent, validation, legacy fallback.
+- src/bin_finder/search/semantic_planner.py: opt-in LocalEditorialPlanner using explicit loopback-only Ollama /api/chat; no startup or production-discovery invocation.
+- tests/test_zb01_semantic_intents.py and tests/test_zb01_local_editorial_planner.py: offline tests for a fake model, invalid responses, URL restrictions and fallback.
+
+No additional dependencies. No production search, F021 verifier, GUI, acquisition, approval, session schema or model installation change.
+
+## Opt-in behavior
+
+An experimental caller explicitly constructs LocalEditorialPlanner() and calls suggest_queries(scene, full_script=..., capsule=...). The result is a query list; it is **not automatically used for a real search**. Constructing the planner does not send a network request.
+
+Defaults: qwen3-vl:4b-instruct (dedicated non-thinking variant), http://127.0.0.1:11434, stream=false, format=json, num_ctx=8192, num_predict=4096, temperature=0. The previously used qwen3-vl:4b tag is a thinking build: in a real ZB-01 smoke it consumed all 4096 generation tokens while final content remained empty (done_reason=length). Its model-specific thinking behavior cannot reliably be disabled with a think=false request. Only ZB-01 uses Instruct; the separate, unmerged F021 vision module and its chosen model remain unchanged. The tool does not pull or install models.
+
+A valid StoryCapsule is optional for scripts no longer than 3000 characters. **Longer scripts require a capsule**: without one, the code fails safely without sending any Ollama request. Automatic full-story capsule creation is *not* implemented; silent truncation is avoided.
+
+## Contract and guards
+
+SceneSearchIntent includes exact scene_id and narration_text, visual_goal, required_entities, must_show, must_not_show, 1–3 queries, uncertainty and provenance. Required named entities must appear in the full script and be retained in every query. Invalid/oversized outputs preserve F002 queries. These checks cannot establish semantic truth; an editor and real footage benchmark remain essential.
+
+Only HTTP loopback endpoints allowed; no URLs with embedded credentials, redirects, system proxies, arbitrary response sizes or unlimited timeouts. No change to scene IDs, licenses or selected clips.
+
+## Validation
+
+- Commit f08e4a0: GitHub Actions Windows run 39921563276 PASS (Python 3.12 compile, full pytest, FFmpeg smokes, PyQt6 GUI).
+- New optional producer: mock tests passed in a standalone local Python harness; **the latest full GitHub Windows run must be inspected separately**.
+- No real Ollama query-generation accuracy test and no provider search benchmark yet.
+
+Windows local test command (on the ZB-01 research branch; not F021):
+
+    $env:PYTHONPATH = "src"
+    python -m pytest -q tests/test_zb01_semantic_intents.py tests/test_zb01_local_editorial_planner.py tests/test_query_builder_f002.py tests/test_scene_planning_f018.py
+
+## Integration gates
+
+1. Full Windows CI and F002/F018 regression PASS.
+2. Separate real Ollama quality study with labeled scenes, negations, ambiguous entities and NO_MATCH.
+3. Compare baseline vs planned queries using identical provider searches and labeled clips: Recall@5, Precision@5, wrong-subject rate, NO_MATCH, latency and VLM cost.
+4. Wire behind an explicit opt-in flag only if evidence shows a benefit; preserve legacy fallback and human approval.
+5. Do not add GitHub repos unless Z5-first proves insufficient.
+
+## Explicit live local Ollama smoke (not CI)
+
+Only in an isolated ZB-01 checkout with Ollama already installed and the qwen3-vl:4b model available. The no-flag invocation is guaranteed not to create the planner or contact a service:
+
+    $env:PYTHONPATH = "src"
+    python -m bin_finder.search.semantic_smoke
+
+To send one text-only query-planning request to local Ollama (not to Z5 or a third-party service), explicitly opt in:
+
+    $env:PYTHONPATH = "src"
+    python -m bin_finder.search.semantic_smoke --approve-local-planner
+
+The script compares baseline and proposed queries for a fixed synthetic example about illuminated office towers. It returns code 2 with ZB01_FALLBACK when no valid structured output is obtained. Any valid JSON is still just a planning candidate: do not treat it as proof that footage was actually found or that the proposed video depicts what was narrated. Do not execute the live smoke in pytest/CI.
+
+## Diagnosing a local ZB01_FALLBACK
+
+The default smoke intentionally reported only fallback. The diagnostic version can be run on the isolated worktree:
+
+    $env:PYTHONPATH = "src"
+    python -m bin_finder.search.semantic_smoke --approve-local-planner --diagnose
+
+This still requires explicit approval for one localhost Ollama request. It prints only the failure code, done_reason, prompt_eval_count, eval_count, thinking_present and content_chars. No raw model output, hidden thinking, credentials or user script is printed.
+
+- empty-content and done_reason=length: likely token/context exhaustion before final JSON.
+- invalid-intent:*: model output rejected by a schema or grounding check.
+- invalid-model-json: model content is not parseable JSON.
+- http-error:404: usually model missing; transport-error: investigate local service.
+- valid: structure passed, but semantic quality is NOT established.
+
+Use this research diagnostic before changing model settings or relaxing the validation gate.
+
+## After the local Thinking-model exhaustion report
+
+Observed on user's Windows machine: prompt_eval_count=264, eval_count=4096, done_reason=length, thinking_present=True, content_chars=0. This proves generation-budget exhaustion for one short test; it does not assess semantic accuracy.
+
+Proposed local ZB-01 model: qwen3-vl:4b-instruct (separate ~3.3 GB download). First run `ollama list` and only pull the model if absent, after user approval:
+
+    ollama pull qwen3-vl:4b-instruct
+
+Then use the existing isolated research worktree and explicit single text-only smoke:
+
+    $env:PYTHONPATH = 'D:\YouTubeTools\Bin_Finder_ZB01_Research\src'
+    & 'D:\YouTubeTools\Bin_Finder\Bin_Finder\.venv\Scripts\python.exe' -m bin_finder.search.semantic_smoke --approve-local-planner --diagnose
+
+CLI model override for an already installed compatible instruct model: `--model name:tag`. No automatic model downloads or fallback to a remote endpoint. Do not merge to main until tests and real-footage relevance improve. Valid structured JSON alone is not a passing search-quality evaluation.
