@@ -152,3 +152,15 @@ The command makes ONE explicit `/api/chat` request to `127.0.0.1:11434`. It prin
 3. If real Ollama struggles with a complete multi-block plan, test a bounded *two-stage* analysis (narrative block outline then shot suggestions) before extending context size or altering production.
 4. Search integration and visual timeline acceptance remain separate ZB-02C/D proposals. No merge, GUI changes, model download or alteration of F021.
 
+
+## First real localhost pilot: synthetic travel (user-run Windows)
+
+The user ran `visual_director_smoke --genre travel --approve-local-planner` at commit `5930178` on Windows. Reported Ollama envelope: `done_reason=stop`, `prompt_eval_count=736`, `eval_count=579`, `thinking_present=false`, `reason=valid`. Output comprised **4 narrated scenes, 2 narrative blocks, 4 proposed shots, and 3 search requests**:
+
+- Block b1 (scenes 001-002): harbor establishing sequence. s1 searches for sunrise fishing boats; s2 searches for unloading fish and mending nets.
+- Block b2 (scenes 003-004): contrast to community life. s3 is a `transition` with **no search query**, then s4 searches for families at the morning market.
+- Queries target concrete filmable subjects; all four scene IDs appear in the visual plan; no legacy scene-level fallback or provider request was made.
+
+**Interpretation:** technical/local-model and structure pass. The scene-003 transition is **not renderable by itself**: no footage is allocated for that narration interval. Later scheduling must ensure a real visual (continue s2, start s4 earlier, or an approved bridging shot) covers any transition-only spoken interval. Structural coverage does not imply frame-by-frame visual coverage. The trial generated one shot action per narrated scene, and it did **not** actually exercise multi-scene `search` or the `hold` strategy; offline tests cover those contracts but the real model has not demonstrated them.
+
+**Not established:** actual stock availability, visual relevance rankings, source licenses, scene-to-shot timing, human editability, or improvement against the old workflow. Test history and economy with the same pinned commit and model before considering a general quality claim. Do not modify production timeline or merge PR #31.
