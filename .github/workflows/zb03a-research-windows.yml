@@ -1,0 +1,62 @@
+name: ZB-03A Research Windows
+
+on:
+  push:
+    branches:
+      - research/zb03a-human-review-timeline
+  pull_request:
+    branches:
+      - research/zb02-narrative-visual-planning
+
+permissions:
+  contents: read
+
+jobs:
+  research-windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    env:
+      QT_QPA_PLATFORM: offscreen
+      PYTHONUTF8: "1"
+      PYTHONPATH: src
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install application and test dependencies
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+
+      - name: Compile draft modules
+        shell: pwsh
+        run: |
+          python -m compileall -q src/bin_finder/draft_timeline.py src/bin_finder/timeline_review_gui.py src/bin_finder/timeline_review_demo.py
+
+      - name: ZB-02 and ZB-03A offline regression tests
+        shell: pwsh
+        run: |
+          $files = @(
+            "tests/test_zb02_visual_planning.py"
+            "tests/test_zb02_visual_director.py"
+            "tests/test_zb02_visual_plan_audit.py"
+            "tests/test_zb03a_draft_timeline.py"
+            "tests/test_zb03a_review_gui.py"
+          )
+          python -m pytest -q @files
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Synthetic offline CLI smoke
+        shell: pwsh
+        run: |
+          foreach ($genre in @("travel", "history", "economy")) {
+            python -m bin_finder.timeline_review_demo --genre $genre --headless
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
