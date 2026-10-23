@@ -18,7 +18,7 @@ No additional dependencies. No production search, F021 verifier, GUI, acquisitio
 
 An experimental caller explicitly constructs LocalEditorialPlanner() and calls suggest_queries(scene, full_script=..., capsule=...). The result is a query list; it is **not automatically used for a real search**. Constructing the planner does not send a network request.
 
-Defaults: qwen3-vl:4b, http://127.0.0.1:11434, stream=false, format=json, num_ctx=8192, num_predict=4096, temperature=0. A thinking model may fail strict parsing: this will fall back to unchanged F002 queries. The tool does not pull or install models.
+Defaults: qwen3-vl:4b-instruct (dedicated non-thinking variant), http://127.0.0.1:11434, stream=false, format=json, num_ctx=8192, num_predict=4096, temperature=0. The previously used qwen3-vl:4b tag is a thinking build: in a real ZB-01 smoke it consumed all 4096 generation tokens while final content remained empty (done_reason=length). Its model-specific thinking behavior cannot reliably be disabled with a think=false request. Only ZB-01 uses Instruct; the separate, unmerged F021 vision module and its chosen model remain unchanged. The tool does not pull or install models.
 
 A valid StoryCapsule is optional for scripts no longer than 3000 characters. **Longer scripts require a capsule**: without one, the code fails safely without sending any Ollama request. Automatic full-story capsule creation is *not* implemented; silent truncation is avoided.
 
@@ -77,3 +77,18 @@ This still requires explicit approval for one localhost Ollama request. It print
 - valid: structure passed, but semantic quality is NOT established.
 
 Use this research diagnostic before changing model settings or relaxing the validation gate.
+
+## After the local Thinking-model exhaustion report
+
+Observed on user's Windows machine: prompt_eval_count=264, eval_count=4096, done_reason=length, thinking_present=True, content_chars=0. This proves generation-budget exhaustion for one short test; it does not assess semantic accuracy.
+
+Proposed local ZB-01 model: qwen3-vl:4b-instruct (separate ~3.3 GB download). First run `ollama list` and only pull the model if absent, after user approval:
+
+    ollama pull qwen3-vl:4b-instruct
+
+Then use the existing isolated research worktree and explicit single text-only smoke:
+
+    $env:PYTHONPATH = 'D:\YouTubeTools\Bin_Finder_ZB01_Research\src'
+    & 'D:\YouTubeTools\Bin_Finder\Bin_Finder\.venv\Scripts\python.exe' -m bin_finder.search.semantic_smoke --approve-local-planner --diagnose
+
+CLI model override for an already installed compatible instruct model: `--model name:tag`. No automatic model downloads or fallback to a remote endpoint. Do not merge to main until tests and real-footage relevance improve. Valid structured JSON alone is not a passing search-quality evaluation.
