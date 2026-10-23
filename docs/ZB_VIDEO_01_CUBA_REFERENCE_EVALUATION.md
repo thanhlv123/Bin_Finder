@@ -73,3 +73,16 @@ foreach ($index in @(2,12,14)) {
 ```
 
 Do **not** evaluate all 15 until the three local results are manually assessed for topic relevance, evidence truthfulness and invalid/NO_MATCH/fallback disposition. The runner never requests reference expected queries or image annotations from Ollama. No real stock footage has been searched or scored.
+
+
+## Three-beat local result: 6d0efac fallback regression and targeted fix
+
+The real Instruct rerun on the user's Windows machine returned valid Ollama envelopes but rejected **all three** candidates: CUBA-02 and CUBA-14 with `invalid-intent:required-entity-lost`; CUBA-12 with `invalid-intent:scene-anchor-not-in-narration`. This is not evidence of model generation failure or stock search relevance.
+
+Subsequent isolated revisions:
+- Compare entity names as **whole normalized tokens**, with controlled singular/plural and Cuba/Cuban alternatives; maintain the rule that truly mandatory entities occur in each query, and reject invented entities.
+- Validate `scene_anchor` as an **ordered subsequence of meaningful words** in the current narration (allows dropped grammatical filler words but not injecting unrelated context). Require two distinct cues for nontrivial narration, and still check topic overlap before accepting queries.
+- Clarify the prompt that `required_entities` contains **only necessary script-grounded proper nouns** actually carried in every query; generic products/cars belong in the visual constraints.
+- Add synthetic tests proving CUBA-14's earlier vintage-car motif is still rejected; CUBA-12's "machines repaired patched" anchor can pass; entity variants must be retained within every search.
+
+The local three-beat Ollama rerun is still required after Windows CI, because structurally valid JSON and synthetic tests are not proof of semantic relevance. No automatic retry, online search, GUI change, F021 change, or merge to main.
