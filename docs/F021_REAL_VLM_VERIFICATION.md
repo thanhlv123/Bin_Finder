@@ -36,7 +36,8 @@ RetrievalUnit -> bounded FFmpeg frame sampling -> local Ollama /api/chat (images
   list (no shell), `BIN_FINDER_FFMPEG`/PATH discovery. Invalid or non-finite ranges, missing or
   linked sources, missing FFmpeg, timeouts and bad output raise `FrameSamplingError`.
 - `ollama_vlm.py` — `OllamaVisionVerifier` (stdlib `urllib`; no new dependency).
-  `POST <base>/api/chat`, `stream=false`, `format=json`, temperature 0, seed 0, base64 frames
+  `POST <base>/api/chat`, `stream=false`, `format=json`, temperature 0, seed 0,
+  `num_ctx` 8192, `num_predict` 2048 (see "Thinking model and token budget"), base64 frames
   only (never the video, a path or transcript/metadata). Loopback only
   (`127.0.0.1`, `localhost`, `::1`; plain `http`, no credentials/path/query); no system proxy;
   redirects refused; response capped at 1 MiB; no Authorization header, no API key.
@@ -68,6 +69,8 @@ for the rest of that `verify()` call so the GUI worker does not wait through eve
 | `BIN_FINDER_OLLAMA_URL` | `http://127.0.0.1:11434` (loopback only) |
 | `BIN_FINDER_VLM_TIMEOUT_SECONDS` | `120` (1–600) |
 | `BIN_FINDER_VLM_FRAMES_PER_UNIT` | `3` (1–6) |
+| `BIN_FINDER_VLM_NUM_CTX` | `8192` (2048–32768) |
+| `BIN_FINDER_VLM_NUM_PREDICT` | `2048` (128–8192, and below `NUM_CTX`) |
 
 `auto`: Ollama per unit with heuristic fallback. `heuristic`: never contacts Ollama.
 `off`: `production_verifier()` returns `None` (the historical behavior; F014 prepares with its
@@ -78,6 +81,26 @@ own heuristic). An invalid mode, model or endpoint never sends frames anywhere a
 `WorkflowService(project_id=…, verifier=production_verifier())`. Construction does no
 network or FFmpeg work; verification runs inside the existing `WorkflowWorker` thread, never on
 the Qt main thread. F014's `prepare()` fallback path for unconfigured/legacy callers is unchanged.
+
+## Thinking model and token budget
+The default `qwen3-vl:4b` is a **Thinking** build: it writes reasoning before the JSON answer.
+Three sampled frames cost about 3.3k prompt tokens, so on real footage a 4096-token window or a
+600-token output cap is exhausted while it is still thinking, the reply `content` is empty, the
+strict parser rejects it and the unit silently falls back to the heuristic verifier.
+
+Real-footage measurements (one clip, `qwen3-vl:4b`, Ollama 0.40.8, 3 frames; not an accuracy study):
+
+| `num_ctx` | `num_predict` | prompt + generated tokens | `done_reason` | result |
+|---|---|---|---|---|
+| 4096 (Ollama default) | 600 | 3324 + 600 | `length` | empty content, heuristic fallback |
+| 4096 (Ollama default) | 2048 | 3324 + 772 = 4096 | `length` | empty content, heuristic fallback |
+| 8192 | 2048 | 3324 + 1018 | `stop` | valid JSON, no fallback |
+
+Hence the defaults `num_ctx=8192` and `num_predict=2048`. A larger context window uses more
+RAM/VRAM and slows the first load; lower the frame count or choose a non-thinking vision model
+if that is a problem. Both values are validated and bounded (above); an invalid value degrades
+to the heuristic verifier without contacting Ollama. Thinking text is never stored or logged.
+Per-unit latency on the measured clip was about 10–19 s.
 
 ## Human approval
 A VLM score never approves anything. The path stays VLM verifies/reranks → F006 clip proposal →
@@ -100,8 +123,11 @@ result prints `PASS_F021_REAL_VLM`; an absent Ollama or model exits nonzero with
 
 ## Limitations
 - Verification quality depends on the local model; the live smoke covered only a synthetic clip; accuracy on real footage is unmeasured.
-- Thinking-mode models may need a non-thinking variant to answer within `num_predict`; otherwise
-  responses fail parsing and the heuristic is used.
+- The default model is a Thinking build and needs the larger token budget above; a long
+  reasoning chain can still exceed `num_predict`, in which case the unit falls back to the
+  heuristic. Only one real clip has been measured at the new defaults.
+- The heuristic fallback has no transcript for raw footage and scores such units at 0.0, so a
+  unit that falls back ranks below verified ones even if it matches.
 - Up to `top_n` (8) units × 3 frames per candidate, processed sequentially; slow on CPU-only machines.
 - Frames sampled at fixed fractions can miss brief events.
 

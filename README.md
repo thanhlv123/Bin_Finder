@@ -188,6 +188,6 @@ an optional local Ollama vision model (default `qwen3-vl:4b`, loopback only, std
 frame sampling), per-unit falling back to the heuristic verifier when Ollama, the model, FFmpeg
 or the response is unavailable. F005 remains the provider contract, F018 the text fallback, and
 F014 human approval is still required. No cloud upload, no model auto-install, no new dependency.
-The live pipeline smoke passed against local `qwen3-vl:4b`; accuracy on real footage has not been validated. See [F021 details](docs/F021_REAL_VLM_VERIFICATION.md).
+The live pipeline smoke passed against local `qwen3-vl:4b`; accuracy on real footage has not been validated. The default `qwen3-vl:4b` is a Thinking model, so requests use `num_ctx` 8192 and `num_predict` 2048 (overridable via `BIN_FINDER_VLM_NUM_CTX` / `BIN_FINDER_VLM_NUM_PREDICT`). See [F021 details](docs/F021_REAL_VLM_VERIFICATION.md).
 
 See `docs/ROADMAP.md` for the milestone plan.

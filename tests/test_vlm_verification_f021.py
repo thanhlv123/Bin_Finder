@@ -217,6 +217,54 @@ def test_config_from_env_defaults_and_validation():
             config_from_env(bad)
 
 
+def test_token_budget_defaults_overrides_and_bounds():
+    # Real-footage finding: the Thinking default model needs more than Ollama's 4096 window
+    # and a 600-token output cap, otherwise the answer is empty and the heuristic is used.
+    config = config_from_env({})
+    assert (config.num_ctx, config.num_predict) == (8192, 2048)
+    assert (VlmConfig().num_ctx, VlmConfig().num_predict) == (8192, 2048)
+    custom = config_from_env({"BIN_FINDER_VLM_NUM_CTX": "16384", "BIN_FINDER_VLM_NUM_PREDICT": "4096"})
+    assert (custom.num_ctx, custom.num_predict) == (16384, 4096)
+    assert config_from_env({"BIN_FINDER_VLM_NUM_CTX": "2048", "BIN_FINDER_VLM_NUM_PREDICT": "128"}).num_ctx == 2048
+    for bad in ({"BIN_FINDER_VLM_NUM_CTX": "2047"}, {"BIN_FINDER_VLM_NUM_CTX": "32769"},
+                {"BIN_FINDER_VLM_NUM_CTX": "-1"}, {"BIN_FINDER_VLM_NUM_CTX": "8192.5"},
+                {"BIN_FINDER_VLM_NUM_CTX": "x"}, {"BIN_FINDER_VLM_NUM_PREDICT": "127"},
+                {"BIN_FINDER_VLM_NUM_PREDICT": "8193"}, {"BIN_FINDER_VLM_NUM_PREDICT": "nan"},
+                {"BIN_FINDER_VLM_NUM_CTX": "4096", "BIN_FINDER_VLM_NUM_PREDICT": "4096"}):
+        with pytest.raises(VlmConfigError):
+            config_from_env(bad)
+    for kwargs in ({"num_ctx": True}, {"num_predict": 2048.0}, {"num_ctx": None}):
+        with pytest.raises(VlmConfigError):
+            VlmConfig(**kwargs).validate()
+
+
+def test_payload_carries_configured_num_ctx_and_num_predict():
+    opener = FakeOpener(envelope(GOOD))
+    verifier(opener).verify(SCENE, [unit()])
+    options = json.loads(opener.requests[0][0].data)["options"]
+    assert (options["num_ctx"], options["num_predict"]) == (8192, 2048)
+    assert (options["temperature"], options["seed"]) == (0, 0)
+    opener = FakeOpener(envelope(GOOD))
+    verifier(opener, num_ctx=12288, num_predict=3000).verify(SCENE, [unit()])
+    options = json.loads(opener.requests[0][0].data)["options"]
+    assert (options["num_ctx"], options["num_predict"]) == (12288, 3000)
+
+
+def test_invalid_budget_never_builds_a_client_or_sends_a_request():
+    opener = FakeOpener(envelope(GOOD))
+    with pytest.raises(VlmConfigError):
+        verifier(opener, num_ctx=100)
+    assert opener.requests == []
+
+
+def test_empty_thinking_only_reply_falls_back_per_unit():
+    # What the real model returned at the old limits: no content, only thinking.
+    empty = json.dumps({"message": {"content": "", "thinking": "..."}, "done_reason": "length"}).encode()
+    primary = verifier(FakeOpener(empty))
+    results = FallbackVerificationProvider(primary, HeuristicContextVerifier()).verify(SCENE, [unit()])
+    assert len(results) == 1 and results[0].provider == "heuristic-context"
+
+
 # ---------------------------------------------------------------- request content
 def test_request_is_loopback_json_with_image_evidence_only():
     opener = FakeOpener(envelope(GOOD))
@@ -402,7 +450,8 @@ def test_factory_modes(monkeypatch):
     assert isinstance(production_verifier({"BIN_FINDER_VLM_MODE": "heuristic"}).provider, HeuristicContextVerifier)
     monkeypatch.setattr(factory_module, "OllamaVisionVerifier",
                         lambda *a, **k: pytest.fail("invalid configuration must not create a VLM client"))
-    for env in ({"BIN_FINDER_OLLAMA_URL": "http://example.com:11434"}, {"BIN_FINDER_VLM_MODE": "cloud"}):
+    for env in ({"BIN_FINDER_OLLAMA_URL": "http://example.com:11434"}, {"BIN_FINDER_VLM_MODE": "cloud"},
+                {"BIN_FINDER_VLM_NUM_CTX": "999999"}, {"BIN_FINDER_VLM_NUM_PREDICT": "abc"}):
         assert isinstance(production_verifier(env).provider, HeuristicContextVerifier)
 
 

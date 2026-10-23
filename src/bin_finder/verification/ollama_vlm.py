@@ -20,6 +20,10 @@ from bin_finder.verification.models import VerificationDimensions, VerificationR
 DEFAULT_URL = "http://127.0.0.1:11434"
 DEFAULT_MODEL = "qwen3-vl:4b"
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
+DEFAULT_NUM_CTX = 8192
+DEFAULT_NUM_PREDICT = 2048
+NUM_CTX_RANGE = (2048, 32768)
+NUM_PREDICT_RANGE = (128, 8192)
 MAX_RESPONSE_BYTES = 1_048_576
 MAX_EXPLANATION_CHARS = 300
 DIMENSIONS = ("subject_match", "action_match", "location_match", "object_match",
@@ -27,6 +31,10 @@ DIMENSIONS = ("subject_match", "action_match", "location_match", "object_match",
 _MODEL = re.compile(r"[A-Za-z0-9._:/-]{1,100}")
 _CONTROL = re.compile(r"[\x00-\x1f\x7f]")
 _FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
+
+
+def _int_between(value, low, high) -> bool:
+    return type(value) is int and low <= value <= high
 
 
 class VlmConfigError(ValueError):
@@ -48,6 +56,10 @@ class VlmConfig:
     url: str = DEFAULT_URL
     timeout: float = 120.0
     frames: int = 3
+    # The default model is a Thinking build: 3 frames use ~3.3k prompt tokens, so Ollama's 4096
+    # default window is exhausted before the JSON answer is written (real-footage finding).
+    num_ctx: int = DEFAULT_NUM_CTX
+    num_predict: int = DEFAULT_NUM_PREDICT
 
     def validate(self) -> None:
         if self.mode not in {"auto", "heuristic", "off"}:
@@ -59,6 +71,10 @@ class VlmConfig:
             raise VlmConfigError("invalid-timeout")
         if not 1 <= self.frames <= FrameSamplingPolicy().max_frames:
             raise VlmConfigError("invalid-frames")
+        if not _int_between(self.num_ctx, *NUM_CTX_RANGE):
+            raise VlmConfigError("invalid-num-ctx")
+        if not _int_between(self.num_predict, *NUM_PREDICT_RANGE) or self.num_predict >= self.num_ctx:
+            raise VlmConfigError("invalid-num-predict")
         validate_loopback_url(self.url)
 
 
@@ -85,12 +101,14 @@ def config_from_env(environ) -> VlmConfig:
     try:
         timeout = float(get("BIN_FINDER_VLM_TIMEOUT_SECONDS", 120))
         frames = int(get("BIN_FINDER_VLM_FRAMES_PER_UNIT", 3))
+        num_ctx = int(get("BIN_FINDER_VLM_NUM_CTX", DEFAULT_NUM_CTX))
+        num_predict = int(get("BIN_FINDER_VLM_NUM_PREDICT", DEFAULT_NUM_PREDICT))
     except ValueError:
         raise VlmConfigError("invalid-number") from None
     config = VlmConfig(mode=get("BIN_FINDER_VLM_MODE", "auto").lower(),
                        model=get("BIN_FINDER_VLM_MODEL", DEFAULT_MODEL),
                        url=get("BIN_FINDER_OLLAMA_URL", DEFAULT_URL),
-                       timeout=timeout, frames=frames)
+                       timeout=timeout, frames=frames, num_ctx=num_ctx, num_predict=num_predict)
     config.validate()
     return config
 
@@ -203,7 +221,8 @@ class OllamaVisionVerifier:
     def _chat(self, scene, unit, frames) -> str:
         payload = {
             "model": self.config.model, "stream": False, "format": "json",
-            "options": {"temperature": 0, "seed": 0, "num_predict": 600},
+            "options": {"temperature": 0, "seed": 0, "num_ctx": self.config.num_ctx,
+                        "num_predict": self.config.num_predict},
             "messages": [{
                 "role": "user", "content": build_prompt(scene, unit, len(frames)),
                 "images": [base64.b64encode(frame).decode("ascii") for frame in frames]}],
