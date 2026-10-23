@@ -62,6 +62,11 @@ Panel 7 exposes the F017 handoff (checked by default, independent of the legacy 
 core `ExportOptions().handoff` stays opt-in. No schema or acceptance changes; consumer
 integration still not implemented. See [F020 contract](F020_PORTABLE_HANDOFF_GUI.md).
 
+F021: Real VLM verification. **Implemented; offline acceptance PASS, live Ollama pipeline smoke PASS
+(qwen3-vl:4b), real-footage accuracy not validated, Windows CI pending**. Local Ollama vision provider over bounded FFmpeg frames with strict parsing
+and per-unit heuristic fallback, wired into the production workflow. F005 contract and F014
+human approval unchanged. See [F021 contract](F021_REAL_VLM_VERIFICATION.md).
+
 ## Architecture principles learned from public footage-search projects
 
 Bin Finder follows a clean-room design inspired by common retrieval patterns:
