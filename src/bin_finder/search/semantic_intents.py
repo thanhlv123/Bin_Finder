@@ -37,8 +37,10 @@ def _stem(word: str) -> str:
     elif len(word) > 4 and word.endswith("ed"):
         word = word[:-2]
     elif len(word) > 4 and word.endswith("es"):
-        word = word[:-2]
-    elif len(word) > 4 and word.endswith("s"):
+        word = (word[:-2] if word.endswith(
+            ("ches", "shes", "sses", "xes", "zzes")
+        ) else word[:-1])
+    elif len(word) > 3 and word.endswith("s") and not word.endswith("ss"):
         word = word[:-1]
     # Controlled demonym variant. Common tags use either Cuba or Cuban.
     if word == "cuban":
