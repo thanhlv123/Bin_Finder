@@ -33,7 +33,9 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 @dataclass(frozen=True)
 class OllamaEditorialConfig:
     url: str = "http://127.0.0.1:11434"
-    model: str = "qwen3-vl:4b"
+    # Text-only editorial planning: avoid the Thinking-only qwen3-vl:4b tag.
+    # F021 vision verification retains its own independent default model.
+    model: str = "qwen3-vl:4b-instruct"
     timeout_seconds: float = 120.0
     num_ctx: int = 8192
     num_predict: int = 4096
