@@ -190,7 +190,8 @@ def test_bad_model_plan_is_rejected_without_fallback_or_output_leakage(modified,
         plan_id="zb02_synthetic_history", diagnostics=diag
     ) is None
     assert diag["reason"] == reason
-    assert "queries" not in repr(diag)
+    assert "old stone bridge river valley" not in repr(diag)
+    assert "historic stone bridge today" not in repr(diag)
     assert len(fake.calls) == 1
 
 
