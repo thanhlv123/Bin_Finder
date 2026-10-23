@@ -6,11 +6,71 @@ Does NOT create AI interpretations or modify GUI, scene records, VLM, or provide
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Mapping, Sequence
 
 
 class InvalidIntent(ValueError):
     """An untrusted editorial plan failed bounded validation."""
+
+
+EVIDENCE_TYPES = frozenset({
+    "direct", "contextual", "editorial_metaphor", "weak_indirect", "no_match",
+})
+# Deliberately compact: these words are grammatical glue, not scene subjects.
+_STOPWORDS = frozenset((
+    "a", "an", "and", "as", "at", "be", "been", "but", "by", "can", "for",
+    "from", "had", "has", "have", "in", "into", "is", "it", "its", "just",
+    "of", "on", "or", "out", "past", "that", "the", "their", "them", "there",
+    "these", "this", "those", "through", "to", "was", "were", "where",
+    "which", "while", "with", "would", "who", "up", "off", "still",
+))
+
+
+def _stem(word: str) -> str:
+    """Minimal comparison normalization, not a language-understanding model."""
+    word = word.casefold()
+    if len(word) > 5 and word.endswith("ies"):
+        return word[:-3] + "y"
+    if len(word) > 5 and word.endswith("ing"):
+        word = word[:-3]
+    elif len(word) > 4 and word.endswith("ed"):
+        word = word[:-2]
+    elif len(word) > 4 and word.endswith("es"):
+        word = word[:-2]
+    elif len(word) > 4 and word.endswith("s"):
+        word = word[:-1]
+    return word
+
+
+def _focus_terms(text: str) -> set[str]:
+    return {
+        _stem(token) for token in re.findall(r"[a-zA-Z0-9]+", text)
+        if len(token) >= 4 and token.casefold() not in _STOPWORDS
+    }
+
+
+def _validate_scene_focus(anchor: str, narration: str, queries: tuple[str, ...]) -> None:
+    """Conservative lexical anti-drift gate; does not claim semantic accuracy.
+
+    At least one anchored cue per query, and two distinct grounded cues across
+    the candidate set where the anchor contains two or more cues. Models can
+    abstain instead of hallucinating a visual for an abstract statement.
+    """
+    normalized_anchor = " ".join(anchor.casefold().split())
+    if normalized_anchor not in " ".join(narration.casefold().split()):
+        raise InvalidIntent("scene-anchor-not-in-narration")
+    focused = _focus_terms(anchor)
+    if not focused:
+        raise InvalidIntent("empty-scene-focus")
+    all_matched: set[str] = set()
+    for query in queries:
+        overlap = focused.intersection(_focus_terms(query))
+        if not overlap:
+            raise InvalidIntent("query-lost-scene-focus")
+        all_matched.update(overlap)
+    if len(focused) >= 2 and len(all_matched) < 2:
+        raise InvalidIntent("insufficient-scene-focus")
 
 
 def _text(value: object, *, max_chars: int, required: bool = False) -> str:
@@ -61,6 +121,8 @@ class SceneSearchIntent:
     queries: tuple[str, ...]
     uncertainty: str
     provenance: str
+    evidence_type: str = "contextual"
+    scene_anchor: str = ""
 
     @classmethod
     def from_mapping(
@@ -80,10 +142,25 @@ class SceneSearchIntent:
         must_show = _list(obj.get("must_show", ()), count=6, max_chars=150)
         must_not_show = _list(obj.get("must_not_show", ()), count=6, max_chars=150)
         queries = _list(obj.get("queries", ()), count=3, max_chars=160)
-        if not queries:
+        evidence = obj.get("evidence_type", "contextual")
+        if not isinstance(evidence, str) or evidence not in EVIDENCE_TYPES:
+            raise InvalidIntent("invalid-evidence-type")
+        # New model contract requires a verbatim current-scene anchor. Legacy
+        # editor plans without these optional research fields stay compatible.
+        anchor = ""
+        if "evidence_type" in obj:
+            anchor = _text(obj.get("scene_anchor"), max_chars=160, required=True)
+        if evidence == "no_match":
+            if queries or required or must_show:
+                raise InvalidIntent("no-match-has-search-requirements")
+            if not _text(obj.get("uncertainty", ""), max_chars=300, required=True):
+                raise InvalidIntent("no-match-without-reason")
+        elif not queries:
             raise InvalidIntent("missing-queries")
         if not isinstance(full_script, str) or len(full_script) > 50000:
             raise InvalidIntent("invalid-script")
+        if anchor:
+            _validate_scene_focus(anchor, narration_text, queries)
         # Named mandatory entities must be grounded in the input script and
         # preserved in each query. Semantic claims still need editorial review.
         for ent in required:
@@ -104,6 +181,8 @@ class SceneSearchIntent:
             queries=queries,
             uncertainty=_text(obj.get("uncertainty", ""), max_chars=300),
             provenance=provenance,
+            evidence_type=evidence,
+            scene_anchor=anchor,
         )
 
 
