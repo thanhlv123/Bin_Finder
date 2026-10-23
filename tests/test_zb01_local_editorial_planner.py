@@ -163,3 +163,45 @@ def test_query_planner_uses_instruct_by_default_without_external_dependencies():
     # F021 remains a separate PR and is intentionally not imported here.
     assert OllamaEditorialConfig().model == "qwen3-vl:4b-instruct"
     assert OllamaEditorialConfig(model="qwen3-vl:4b-instruct").validate().startswith("http://")
+
+
+def test_bounded_rejected_preview_is_opt_in_and_never_captures_script_or_thinking():
+    bad = valid_plan()
+    bad["required_entities"] = ["Beijing"]
+    bad["scene_anchor"] = "office lights"
+    bad["evidence_type"] = "direct"
+    bad["private_extra"] = "DO_NOT_EXPOSE_PRIVATE_TEXT"
+    diagnostic = {}
+    planner = LocalEditorialPlanner(opener=FakeOpener(bad))
+    assert planner.propose(scene(), full_script=SCRIPT, diagnostics=diagnostic) is None
+    assert diagnostic["reason"] == "invalid-intent:unsupported-required-entity"
+    assert "rejected_plan_preview" not in diagnostic
+
+    diagnostic = {}
+    assert planner.propose(
+        scene(), full_script=SCRIPT, diagnostics=diagnostic,
+        inspect_rejection=True,
+    ) is None
+    preview = diagnostic["rejected_plan_preview"]
+    assert preview["required_entities"] == ["Beijing"]
+    assert preview["queries"] == valid_plan()["queries"]
+    assert "narration_text" not in preview
+    assert "private_extra" not in preview
+    assert "DO_NOT_EXPOSE_PRIVATE_TEXT" not in repr(diagnostic)
+
+
+def test_rejection_preview_stays_bounded_on_untrusted_values():
+    bad = valid_plan()
+    bad["required_entities"] = ["Beijing"]
+    bad["queries"] = ["X" * 100_000]
+    bad["scene_anchor"] = "Y" * 100_000
+    diagnostic = {}
+    planner = LocalEditorialPlanner(opener=FakeOpener(bad))
+    assert planner.propose(
+        scene(), full_script=SCRIPT, diagnostics=diagnostic,
+        inspect_rejection=True,
+    ) is None
+    preview = diagnostic["rejected_plan_preview"]
+    assert "queries" not in preview
+    assert "scene_anchor" not in preview
+    assert "required_entities" in preview
