@@ -201,3 +201,29 @@ def test_rejection_preview_stays_bounded_on_untrusted_values():
     assert "queries" not in preview
     assert "scene_anchor" not in preview
     assert preview["required_entities"] == ["Beijing"]
+
+
+
+def test_rejected_field_shapes_expose_only_type_not_content():
+    from bin_finder.search.semantic_planner import _bounded_rejected_preview
+
+    rejected = {
+        "narration_text": "PRIVATE INPUT NEVER EXPOSE",
+        "queries": ["fixed subject search"],
+        "required_entities": None,
+        "must_show": {"unexpected": "SECRET MARKER"},
+        "must_not_show": ["unobservable proof claim"],
+    }
+    preview = _bounded_rejected_preview(rejected)
+    assert preview["field_shapes"] == {
+        "queries": "list:1",
+        "required_entities": "null",
+        "must_show": "object",
+        "must_not_show": "list:1",
+    }
+    assert "narration_text" not in preview
+    assert "PRIVATE INPUT" not in repr(preview)
+    assert "SECRET MARKER" not in repr(preview)
+    assert "must_show" not in (
+        k for k in preview if k != "field_shapes"
+    )
