@@ -60,3 +60,20 @@ To send one text-only query-planning request to local Ollama (not to Z5 or a thi
     python -m bin_finder.search.semantic_smoke --approve-local-planner
 
 The script compares baseline and proposed queries for a fixed synthetic example about illuminated office towers. It returns code 2 with ZB01_FALLBACK when no valid structured output is obtained. Any valid JSON is still just a planning candidate: do not treat it as proof that footage was actually found or that the proposed video depicts what was narrated. Do not execute the live smoke in pytest/CI.
+
+## Diagnosing a local ZB01_FALLBACK
+
+The default smoke intentionally reported only fallback. The diagnostic version can be run on the isolated worktree:
+
+    $env:PYTHONPATH = "src"
+    python -m bin_finder.search.semantic_smoke --approve-local-planner --diagnose
+
+This still requires explicit approval for one localhost Ollama request. It prints only the failure code, done_reason, prompt_eval_count, eval_count, thinking_present and content_chars. No raw model output, hidden thinking, credentials or user script is printed.
+
+- empty-content and done_reason=length: likely token/context exhaustion before final JSON.
+- invalid-intent:*: model output rejected by a schema or grounding check.
+- invalid-model-json: model content is not parseable JSON.
+- http-error:404: usually model missing; transport-error: investigate local service.
+- valid: structure passed, but semantic quality is NOT established.
+
+Use this research diagnostic before changing model settings or relaxing the validation gate.
