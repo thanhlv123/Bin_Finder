@@ -122,12 +122,12 @@ class DraftTimeline:
             raise DraftTimelineError("shot-locked")
         if item.strategy != "search":
             raise DraftTimelineError("shot-does-not-search")
+        if not isinstance(candidate, DraftCandidate):
+            raise DraftTimelineError("invalid-candidate")
         if len(item.candidates) >= _MAX_CANDIDATES:
             raise DraftTimelineError("too-many-candidates")
         if any(c.candidate_id == candidate.candidate_id for c in item.candidates):
             raise DraftTimelineError("duplicate-candidate")
-        if not isinstance(candidate, DraftCandidate):
-            raise DraftTimelineError("invalid-candidate")
         return self._replace(replace(
             item, candidates=item.candidates + (candidate,)
         ))
