@@ -112,3 +112,43 @@ $env:PYTHONPATH = 'D:\YouTubeTools\Bin_Finder_ZB02_Research\src'
 ```
 
 Do not create a new worktree at the above path until a Windows checkout or worktree plan is approved. GitHub Actions on the draft PR can test the code without a local setup.
+
+
+## ZB-02 B — opt-in AI Visual Director prototype
+
+Implementation:
+- `src/bin_finder/visual_director.py`: independently implemented localhost-only Ollama adapter. Uses the preinstalled `qwen3-vl:4b-instruct` for **text** planning; does not alter any F021 model. One explicit call per `propose(...)` invocation, no automatic retries, no source downloading, no provider access, no GUI integration or saved private script.
+- Producer accepts only a **small bounded storyboard sample** (1–8 existing ordered `SceneRecord` objects; combined narration <=4,000 characters), with stable `plan_id`. The local Ollama request carries only `scene_id` and its narration, not reference answers or purchased video assets. The system prompt treats narration as untrusted data.
+- Model generates a full `bin_finder_visual_plan_v1` draft with story blocks and variable-length shots. `parse_visual_story_plan` validates the result (including required coverage); invalid model output produces **no plan and no fabricated search fallback**. Fixed-code diagnostics include only status, token counts, content length and presence/absence of thinking—no source text or raw model output.
+- The bounded pilot allows no more than 2 shots per narration scene. This is a research limit, not a final editorial rule. An opening visual must be a `search` or `graphic` shot; `transition` and `hold` cannot appear before a visual exists.
+- `src/bin_finder/visual_director_smoke.py` offers three invented **synthetic** genres, with a separate human-authored offline example for each: `travel`, `history`, `economy`. The offline examples are *illustrative*, not ground truth. They are **never sent** to Ollama. `tests/test_zb02_visual_director.py` uses a fake Ollama transport to verify all three, without network.
+
+### Safe offline examples, no Ollama
+
+On the same existing Python 3.12 environment, from an isolated checked-out ZB-02 source path:
+
+```powershell
+$env:PYTHONPATH = 'D:\YouTubeTools\Bin_Finder_ZB02_Research\src'
+$python = 'D:\YouTubeTools\Bin_Finder\Bin_Finder\.venv\Scripts\python.exe'
+& $python -m bin_finder.visual_director_smoke --genre travel
+& $python -m bin_finder.visual_director_smoke --genre history
+& $python -m bin_finder.visual_director_smoke --genre economy
+```
+
+Without the next flag, the tool **does not construct** the local model adapter and returns explicitly labeled `EDITORIAL_EXAMPLE_ONLY_NO_MODEL`.
+
+### Live local model only after user approval
+
+```powershell
+& $python -m bin_finder.visual_director_smoke --genre travel --approve-local-planner
+```
+
+The command makes ONE explicit `/api/chat` request to `127.0.0.1:11434`. It prints either `VALID_MODEL_STRUCTURE_NOT_FOOTAGE_ACCURACY` and the full proposed *synthetic* visual plan, or `INVALID_MODEL_PLAN_NO_PROVIDER_REQUESTS` with bounded diagnostics, exit code 2. Do not interpret JSON validity as production footage success. Running all three genres requires three explicit commands/requests.
+
+### Next acceptance gates
+
+1. Windows CI pass with all legacy tests and three-genre fake Ollama fixtures.
+2. Only then a controlled **local** three-genre real Ollama trial to inspect actual planning behavior. Qualitative criteria: grouped narrative purpose; meaningful transitions/holds; fewer unnecessary searches; no misleading evidence; reasonable shots/scene flexibility.
+3. If real Ollama struggles with a complete multi-block plan, test a bounded *two-stage* analysis (narrative block outline then shot suggestions) before extending context size or altering production.
+4. Search integration and visual timeline acceptance remain separate ZB-02C/D proposals. No merge, GUI changes, model download or alteration of F021.
+
