@@ -40,6 +40,9 @@ def _stem(word: str) -> str:
         word = word[:-2]
     elif len(word) > 4 and word.endswith("s"):
         word = word[:-1]
+    # Controlled demonym variant. Common tags use either Cuba or Cuban.
+    if word == "cuban":
+        return "cuba"
     return word
 
 
@@ -57,12 +60,28 @@ def _validate_scene_focus(anchor: str, narration: str, queries: tuple[str, ...])
     the candidate set where the anchor contains two or more cues. Models can
     abstain instead of hallucinating a visual for an abstract statement.
     """
-    normalized_anchor = " ".join(anchor.casefold().split())
-    if normalized_anchor not in " ".join(narration.casefold().split()):
-        raise InvalidIntent("scene-anchor-not-in-narration")
-    focused = _focus_terms(anchor)
-    if not focused:
+    # Model often removes stopwords from a copied excerpt (e.g. "machines
+    # repaired patched" from "machines that have been repaired and patched").
+    # Require all meaningful anchor tokens in source order; never accept an
+    # injected off-scene subject just because it appears in the story overview.
+    anchor_tokens = [
+        _stem(token) for token in re.findall(r"[a-zA-Z0-9]+", anchor)
+        if len(token) >= 4 and token.casefold() not in _STOPWORDS
+    ]
+    narration_tokens = [
+        _stem(token) for token in re.findall(r"[a-zA-Z0-9]+", narration)
+        if len(token) >= 4 and token.casefold() not in _STOPWORDS
+    ]
+    if not anchor_tokens:
         raise InvalidIntent("empty-scene-focus")
+    # Do not let the model anchor only on a broad place name while discussing
+    # local goods/prices/actions. Require >=2 distinct cues when available.
+    if len(set(narration_tokens)) >= 2 and len(set(anchor_tokens)) < 2:
+        raise InvalidIntent("weak-scene-anchor")
+    iterator = iter(narration_tokens)
+    if not all(any(word == cue for word in iterator) for cue in anchor_tokens):
+        raise InvalidIntent("scene-anchor-not-in-narration")
+    focused = set(anchor_tokens)
     # Explicit valid abstention has no searches to ground. Still validate its
     # anchor against the actual current narration.
     if not queries:
@@ -165,12 +184,26 @@ class SceneSearchIntent:
             raise InvalidIntent("invalid-script")
         if anchor:
             _validate_scene_focus(anchor, narration_text, queries)
-        # Named mandatory entities must be grounded in the input script and
-        # preserved in each query. Semantic claims still need editorial review.
+        # Script-anchored mandatory terms are preserved in *every* query.
+        # Compare whole normalized tokens rather than raw substrings, so
+        # Chevrolet/Chevrolets and Cuba/Cuban are accepted, but invented
+        # locations and dropped entities are still rejected.
+        script_terms = tuple(_stem(t) for t in re.findall(r"[a-zA-Z0-9]+", full_script))
         for ent in required:
-            if ent.casefold() not in full_script.casefold():
+            ent_terms = tuple(_stem(t) for t in re.findall(r"[a-zA-Z0-9]+", ent))
+            if not ent_terms:
                 raise InvalidIntent("unsupported-required-entity")
-            if any(ent.casefold() not in q.casefold() for q in queries):
+            def contains_phrase(haystack: tuple[str, ...]) -> bool:
+                return any(
+                    haystack[i:i + len(ent_terms)] == ent_terms
+                    for i in range(len(haystack) - len(ent_terms) + 1)
+                )
+            if not contains_phrase(script_terms):
+                raise InvalidIntent("unsupported-required-entity")
+            if any(
+                not contains_phrase(tuple(_stem(t) for t in re.findall(r"[a-zA-Z0-9]+", q)))
+                for q in queries
+            ):
                 raise InvalidIntent("required-entity-lost")
         provenance = _text(obj.get("provenance", ""), max_chars=50, required=True)
         if provenance not in ("script", "editor_review"):
