@@ -146,3 +146,24 @@ Neither mode sends any request without explicit `--approve-provider-calls`. The 
 **Interpretation:** if the simple request succeeds while the ordinary request fails, inspect optional request parameters. If **both still produce 400**, do *not* keep blindly changing search keywords; inspect whether credentials were copied to the correct provider and whether the network/proxy modifies requests. HTTP response bodies are intentionally hidden to prevent leaking Pixabay's query parameter key. The proxy boolean is a clue, not proof of a proxy-caused error.
 
 The new tests mock the HTTP client; they do **not** hit either provider on GitHub CI.
+
+
+## BF-S02 safe server-error-body classification (two minimal GETs, 2026-10-26)
+
+Latest user Windows test: both Pexels and Pixabay returned HTTP 400 to the previous *minimal* `nature` queries, with no detected proxy and `KEY_SHAPE=unverified` (the latter does **not** mean keys are valid). Official API docs confirm the endpoints and minimal parameters are well-formed, so this is **not evidence of a broken query planner** or a bad video search term.
+
+The normal Bin Finder `JsonHttpClient` intentionally sanitizes `HTTPError` down to `ProviderError("Provider: HTTP 400")`, losing the server's explanation. We now provide a **separate opt-in research diagnostic** `--diagnose-error-body`, implemented in `search/provider_error_probe.py`, WITHOUT touching that production client. It sends **one** minimal documented GET **only after** `--approve-provider-calls`, reads at most 2048 bytes of an HTTP error body and converts it to one of these **fixed hints**:
+
+- `invalid-api-key-indicated` / `missing-api-key-indicated`: server text explicitly indicates key problems, not independent proof.
+- `access-denied-indicated` / `rate-limit-indicated` / `edge-challenge-indicated`: server text suggests a permission/quota/edge response.
+- `invalid-request-parameter-indicated`: server text suggests invalid request fields.
+- `html-error-body` / `generic-bad-request` / `unclassified-error-body`: cannot infer the actual root cause.
+
+The probe returns only `BFS02_DIAGNOSTIC_CODE`, `BFS02_SERVER_HINT`, bounded hit count, call count and provider name. **It never prints response body, full URL (Pixabay key is in the URL), HTTP headers, request headers, exception string, key, traceback or provider credentials**. Errors and unknown responses map to fixed codes. No persistence, retries, downloads or model calls. The upper success JSON size is bounded to 512 KiB.
+
+```powershell
+& $python -m bin_finder.search.slot_search_smoke --provider pexels --project-root 'D:\YouTubeTools\Bin_Finder\Bin_Finder' --diagnose-error-body --approve-provider-calls
+& $python -m bin_finder.search.slot_search_smoke --provider pixabay --project-root 'D:\YouTubeTools\Bin_Finder\Bin_Finder' --diagnose-error-body --approve-provider-calls
+```
+
+**Important:** the keys must be available to this process through environment variables or local gitignored `config/providers.local.json`; they are not stored by the command. If `BFS02_SERVER_HINT=unclassified-error-body`, do not conclude the key is wrong or log raw bodies; the next manual step is checking the provider dashboards, API key type/account, or network path. User live pilot not yet rerun with this option; CI tests use injected fake HTTPError responses only.
