@@ -22,6 +22,7 @@ class SlotSearchError(ValueError):
     """Stable diagnostic code; no provider raw errors or user text are exposed."""
 
 
+_QUERY_AXES = ("subject", "moment", "action")
 _HTTP_PATTERN = re.compile(r"^(?:Pexels|Pixabay): HTTP ([45][0-9]{2})$")
 
 _SAFE_UPSTREAM_ERRORS = {
@@ -114,6 +115,9 @@ class SlotSearchResult:
     slot_id: str
     hits: tuple[CandidateHit, ...]
     attempts: tuple[SearchAttempt, ...]
+    unique_discovered: int = 0
+    trimmed_by_cap: int = 0
+    axis_discovered: tuple[tuple[str, int], ...] = ()
 
     @property
     def status(self) -> str:
@@ -142,6 +146,41 @@ class SearchRun:
             if result.slot_id == slot_id:
                 return result
         raise SlotSearchError("unknown-search-slot")
+
+
+def _balanced_candidates(
+    discovered: dict[tuple[str, str], CandidateHit],
+    provider_keys: tuple[str, ...],
+    limit: int,
+) -> tuple[CandidateHit, ...]:
+    """Round-robin by query axis AND source, after slot-local deduplication.
+
+    The algorithm selects a review pool, NOT a relevance ranking. Every
+    candidate keeps first-seen metadata and its full matched_axes; repeated
+    hits count once. A bucket that runs out simply yields to other buckets.
+    """
+    buckets: list[list[CandidateHit]] = [
+        [hit for hit in discovered.values()
+         if hit.candidate.provider == provider_key and axis in hit.matched_axes]
+        for axis in _QUERY_AXES for provider_key in provider_keys
+    ]
+    chosen: list[CandidateHit] = []
+    used: set[tuple[str, str]] = set()
+    # Every sweep either picks at least one new candidate or stops.
+    while len(chosen) < limit:
+        progress = False
+        for bucket in buckets:
+            candidate = next((item for item in bucket if item.key not in used), None)
+            if candidate is None:
+                continue
+            chosen.append(candidate)
+            used.add(candidate.key)
+            progress = True
+            if len(chosen) >= limit:
+                break
+        if not progress:
+            break
+    return tuple(chosen)
 
 
 class SlotCandidateSearch:
@@ -240,7 +279,7 @@ class SlotCandidateSearch:
                                     previous,
                                     matched_axes=previous.matched_axes + (query.axis,),
                                 )
-                        elif len(found) < options.max_candidates_per_slot:
+                        else:
                             found[key] = CandidateHit(
                                 slot_id=slot.slot_id,
                                 beat_id=slot.beat_id,
@@ -253,10 +292,19 @@ class SlotCandidateSearch:
                         slot.slot_id, provider_key, query.axis,
                         "ok" if received else "empty", received,
                     ))
+            balanced = _balanced_candidates(
+                found, options.provider_keys, options.max_candidates_per_slot
+            )
             results.append(SlotSearchResult(
                 slot_id=slot.slot_id,
-                hits=tuple(found.values()),
+                hits=balanced,
                 attempts=tuple(attempts),
+                unique_discovered=len(found),
+                trimmed_by_cap=len(found) - len(balanced),
+                axis_discovered=tuple(
+                    (axis, sum(axis in hit.matched_axes for hit in found.values()))
+                    for axis in _QUERY_AXES
+                ),
             ))
         return SearchRun(
             plan_id=plan.plan_id,
