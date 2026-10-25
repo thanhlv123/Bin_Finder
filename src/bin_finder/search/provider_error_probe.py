@@ -48,7 +48,7 @@ def classify_error_body(raw: bytes) -> str:
 
     key = r"(?:api[ _-]?key|access[ _-]?token|\bkey\b)"
     bad = r"(?:invalid|expired|revoked|incorrect|unknown|not valid|unrecognized)"
-    missing = r"(?:missing|required|not provided|no|must provide)"
+    missing = r"(?:missing|required|not provided|please provide|must provide)"
     if (re.search(r"\b" + bad + r"\b.{0,50}" + key, value)
             or re.search(key + r".{0,50}\b" + bad + r"\b", value)):
         return "invalid-api-key-indicated"
