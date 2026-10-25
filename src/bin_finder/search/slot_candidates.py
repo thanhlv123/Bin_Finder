@@ -85,8 +85,13 @@ class SlotSearchResult:
     def status(self) -> str:
         if self.hits:
             return "candidates-unverified"
-        if any(a.status == "provider-error" for a in self.attempts):
+        if any(a.status in {"provider-error", "invalid-provider-result",
+                            "invalid-provider-status"} for a in self.attempts):
             return "technical-error-no-candidates"
+        if self.attempts and all(
+            a.status == "not-configured" for a in self.attempts
+        ):
+            return "provider-unavailable"
         return "no-candidates-found"
 
 
