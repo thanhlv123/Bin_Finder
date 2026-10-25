@@ -61,7 +61,41 @@ $env:PYTHONPATH = 'D:\YouTubeTools\Bin_Finder_BFS02_Research\src'
 & $python -m pytest -q 'D:\YouTubeTools\Bin_Finder_BFS02_Research\tests\test_bf_s02_slot_candidates.py'
 ```
 
-A separate CLI opt-in live-provider pilot and real footage precision@3 / precision@5 benchmarks are follow-up acceptance gates. **Do not claim footage relevance improvement or automated timeline usability based on these tests.**
+The CLI opt-in provider pilot is now available, but **has not yet been run against real providers**. Real footage precision@3 / precision@5 benchmarks remain a follow-up acceptance gate. **Do not claim footage relevance improvement or automated timeline usability based on these tests.**
+
+## Optional one-slot pilot (no automatic provider calls)
+
+Module: `src/bin_finder/search/slot_search_smoke.py`.
+
+**Default is offline**, showing the synthetic plan and its three distinct
+queries, without reading provider credentials or accessing any provider:
+
+```powershell
+$python = 'D:\YouTubeTools\Bin_Finder\Bin_Finder\.venv\Scripts\python.exe'
+$env:PYTHONPATH = 'D:\YouTubeTools\Bin_Finder_BFS02_Research\src'
+& $python -m bin_finder.search.slot_search_smoke --provider pexels
+```
+
+When a user explicitly chooses to run a real API pilot, they may add
+`--approve-provider-calls` and `--project-root` pointing to the local
+Bin Finder installation that already contains `config/providers.local.json`
+or environment configuration. Pexels/Pixabay/local are the only allowed
+pilot source choices, and **at most 3 search requests** are made for
+**one synthetic slot**. Each request may consume provider API quota.
+
+```powershell
+& $python -m bin_finder.search.slot_search_smoke --provider pexels --project-root 'D:\YouTubeTools\Bin_Finder\Bin_Finder' --approve-provider-calls
+```
+
+The pilot prints candidate titles/source IDs and matched axes, but never
+logs API secrets, complete raw payloads or temporary media download URLs.
+Its candidates are not verified by VLM, licensed/approved, downloaded,
+persisted, or converted to a video timeline. If no source is configured,
+the outcome is `not-configured` with zero calls. The user can choose
+to **not** run the live pilot until BF-S03 human evaluation is prepared.
+
+`tests/test_bf_s02_slot_search_smoke.py` verifies offline default and
+mocks the approved provider path in CI; it never sends network traffic.
 
 ## Next stage — BF-S03
 
