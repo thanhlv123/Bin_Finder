@@ -73,7 +73,15 @@ def main(argv: list[str] | None = None) -> int:
         "--diagnose-single-query", action="store_true",
         help="Send at most one search query and print ONLY safe error codes",
     )
+    parser.add_argument(
+        "--diagnose-minimal-request", action="store_true",
+        help="Send one minimal documented GET with no video size filter",
+    )
     args = parser.parse_args(argv)
+    if args.diagnose_minimal_request and args.diagnose_single_query:
+        parser.error("Choose only one diagnostic mode")
+    if args.diagnose_minimal_request and args.provider == "local":
+        parser.error("Minimal HTTP diagnostics support pexels/pixabay only")
     scenes, plan = synthetic_example()
     req = plan.search_requests()[0]
     print("BFS02_MODE:", "APPROVED_PROVIDER_PILOT" if args.approve_provider_calls
@@ -95,9 +103,74 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     # Only explicit opt-in reaches this block or loads private provider config.
-    registry = ProviderRegistry.from_config(
-        ProviderConfig.load(Path(args.project_root))
-    )
+    config = ProviderConfig.load(Path(args.project_root))
+    if args.diagnose_minimal_request:
+        from urllib.request import getproxies
+        from bin_finder.providers.base import ProviderError
+        from bin_finder.providers.http import JsonHttpClient
+
+        api_key = (config.pexels_api_key if args.provider == "pexels"
+                   else config.pixabay_api_key)
+        if not api_key:
+            code = "not-configured"
+            calls = 0
+            count = 0
+        else:
+            if args.provider == "pexels":
+                endpoint = "https://api.pexels.com/v1/videos/search"
+                params = {"query": "nature", "per_page": 1}
+                headers = {"Authorization": api_key}
+                provider_name = "Pexels"
+                result_field = "videos"
+            else:
+                endpoint = "https://pixabay.com/api/videos/"
+                params = {"key": api_key, "q": "nature", "per_page": 3}
+                headers = {}
+                provider_name = "Pixabay"
+                result_field = "hits"
+            calls = 1
+            count = 0
+            try:
+                data = JsonHttpClient().get_json(
+                    endpoint, params=params, headers=headers,
+                    provider_name=provider_name, timeout=15.0,
+                )
+                rows = data.get(result_field)
+                if not isinstance(rows, list):
+                    code = "invalid-provider-result"
+                else:
+                    count = len(rows)
+                    code = "ok" if count else "empty"
+            except ProviderError as exc:
+                code = safe_provider_error_code(exc)
+            except Exception:
+                # Never serialize urllib exception or full URL; Pixabay
+                # includes the API key in the request query string.
+                code = "unexpected-provider-exception"
+        # Print shape issues only. Never print key content, hash, or URL.
+        if not api_key:
+            key_shape = "missing"
+        elif api_key.lower().startswith("bearer "):
+            key_shape = "bearer-prefix"
+        elif api_key.lower().startswith("key="):
+            key_shape = "key-equals-prefix"
+        elif (api_key[:1] in ("'", '"') or api_key[-1:] in ("'", '"')):
+            key_shape = "surrounding-quotes"
+        elif api_key.upper() in ("YOUR_API_KEY", "API_KEY", "INSERT_KEY_HERE"):
+            key_shape = "placeholder-like"
+        else:
+            key_shape = "unverified"
+        print("BFS02_DIAGNOSTIC_MODE: MINIMAL_REQUEST")
+        print("BFS02_PROVIDER:", args.provider)
+        print("BFS02_PROVIDER_CALLS:", calls)
+        print("BFS02_KEY_SHAPE:", key_shape)
+        print("BFS02_PROXY_CONFIG_PRESENT:", bool(getproxies()))
+        print("BFS02_DIAGNOSTIC_CODE:", code)
+        print("BFS02_UNVERIFIED_CANDIDATES:", count)
+        print("BFS02_STATUS: DIAGNOSTIC_ONLY_NO_SELECTION")
+        return 0
+
+    registry = ProviderRegistry.from_config(config)
     if args.diagnose_single_query:
         from bin_finder.providers.base import (
             ProviderError, ProviderSearchResult, SearchRequest,
