@@ -69,6 +69,10 @@ def main(argv: list[str] | None = None) -> int:
         "--approve-provider-calls", action="store_true",
         help="Explicitly authorize up to 3 configured-provider search calls",
     )
+    parser.add_argument(
+        "--diagnose-single-query", action="store_true",
+        help="Send at most one search query and print ONLY safe error codes",
+    )
     args = parser.parse_args(argv)
     scenes, plan = synthetic_example()
     req = plan.search_requests()[0]
@@ -87,13 +91,57 @@ def main(argv: list[str] | None = None) -> int:
     from bin_finder.provider_config import ProviderConfig
     from bin_finder.providers.registry import ProviderRegistry
     from bin_finder.search.slot_candidates import (
-        SlotCandidateSearch, SlotSearchOptions,
+        SlotCandidateSearch, SlotSearchOptions, safe_provider_error_code,
     )
 
     # Only explicit opt-in reaches this block or loads private provider config.
     registry = ProviderRegistry.from_config(
         ProviderConfig.load(Path(args.project_root))
     )
+    if args.diagnose_single_query:
+        from bin_finder.providers.base import (
+            ProviderError, ProviderSearchResult, SearchRequest,
+        )
+        source = registry.get(args.provider)
+        code = "not-configured"
+        count = 0
+        calls = 0
+        if source is not None:
+            try:
+                ready = source.status().configured
+            except Exception:
+                ready = False
+                code = "invalid-provider-status"
+            if ready:
+                calls = 1
+                try:
+                    response = source.search(SearchRequest(
+                        scene_id=scenes[0].scene_id,
+                        query=req.queries[0].text,
+                        limit=1,
+                        min_height=720,
+                    ))
+                except ProviderError as exc:
+                    code = safe_provider_error_code(exc)
+                except Exception:
+                    # Do not serialize exception text or traceback; adapters
+                    # may contain HTTP URLs with API keys as query params.
+                    code = "unexpected-provider-exception"
+                else:
+                    if (isinstance(response, ProviderSearchResult)
+                            and response.provider_key == args.provider
+                            and isinstance(response.candidates, list)):
+                        count = len(response.candidates[:1])
+                        code = "ok" if count else "empty"
+                    else:
+                        code = "invalid-provider-result"
+        print("BFS02_DIAGNOSTIC_MODE: SINGLE_QUERY")
+        print("BFS02_PROVIDER_CALLS:", calls)
+        print("BFS02_DIAGNOSTIC_CODE:", code)
+        print("BFS02_UNVERIFIED_CANDIDATES:", count)
+        print("BFS02_STATUS: DIAGNOSTIC_ONLY_NO_SELECTION")
+        return 0
+
     results = SlotCandidateSearch(registry).search(
         plan, scenes,
         SlotSearchOptions(
@@ -108,7 +156,7 @@ def main(argv: list[str] | None = None) -> int:
     print("BFS02_UNVERIFIED_CANDIDATES:", len(item.hits))
     for attempt in item.attempts:
         print("BFS02_ATTEMPT:", attempt.axis, attempt.status,
-              attempt.received)
+              attempt.received, attempt.error_code)
     # No signed/temporary URLs, raw response payload, credential or user data.
     for hit in item.hits[:5]:
         print("BFS02_CANDIDATE:", _safe_label(hit.candidate.title),
