@@ -249,14 +249,28 @@ def main(argv: list[str] | None = None) -> int:
     print("BFS02_PROVIDER_CALLS:", results.provider_calls)
     print("BFS02_SLOT_STATUS:", item.status)
     print("BFS02_UNVERIFIED_CANDIDATES:", len(item.hits))
+    print("BFS02_UNIQUE_DISCOVERED:", item.unique_discovered)
+    print("BFS02_TRIMMED_BY_CAP:", item.trimmed_by_cap)
+    print("BFS02_SELECTION_POLICY: balanced-axis-provider-review-pool")
+    for axis, discovered_count in item.axis_discovered:
+        kept_count = sum(axis in hit.matched_axes for hit in item.hits)
+        print("BFS02_AXIS_COVERAGE:", axis, "discovered=" + str(discovered_count),
+              "kept=" + str(kept_count))
     for attempt in item.attempts:
         print("BFS02_ATTEMPT:", attempt.axis, attempt.status,
               attempt.received, attempt.error_code)
-    # No signed/temporary URLs, raw response payload, credential or user data.
-    for hit in item.hits[:5]:
-        print("BFS02_CANDIDATE:", _safe_label(hit.candidate.title),
+    # Print the ENTIRE bounded review pool (not just top five). This remains
+    # unranked, unverified footage metadata; exclude signed URLs and payloads.
+    print("BFS02_REPORT_ITEMS:", len(item.hits))
+    for number, hit in enumerate(item.hits, 1):
+        print("BFS02_CANDIDATE:", "rank=" + str(number),
+              _safe_label(hit.candidate.title, 160),
               "source=" + _safe_label(hit.candidate.source_id, 80),
-              "axes=" + ",".join(hit.matched_axes))
+              "provider=" + _safe_label(hit.candidate.provider, 40),
+              "axes=" + ",".join(hit.matched_axes),
+              "duration=" + _safe_label(str(hit.candidate.duration), 20),
+              "resolution=" + _safe_label(hit.candidate.resolution or "unknown", 30),
+              "rights=" + _safe_label(hit.candidate.rights_status, 40))
     print("BFS02_STATUS: COMPLETED_UNVERIFIED_NO_SELECTION")
     return 0
 
