@@ -12,7 +12,7 @@ from bin_finder.providers.base import (
 from bin_finder.providers.registry import ProviderRegistry
 from bin_finder.search.slot_candidates import (
     SearchRun, SlotCandidateSearch, SlotSearchError,
-    SlotSearchOptions, SlotSearchResult,
+    SlotSearchOptions, SlotSearchResult, safe_provider_error_code,
 )
 from bin_finder.search.slot_review_pool import CandidateReviewPool
 from bin_finder.search.visual_search_contract import (
@@ -367,3 +367,44 @@ def test_real_empty_search_is_distinct_from_technical_failure():
     )
     assert run.slot("s1").status == "no-candidates-found"
     assert all(a.status == "empty" for a in run.slot("s1").attempts)
+
+
+
+@pytest.mark.parametrize("message,expected", [
+    ("Pexels: HTTP 401", "http-401"),
+    ("Pixabay: HTTP 403", "http-403"),
+    ("Pixabay: HTTP 429", "http-429"),
+    ("Pexels: HTTP 500", "http-500"),
+    ("Pexels: không thể kết nối mạng", "network-unreachable"),
+    ("Pixabay: hết thời gian chờ", "timeout"),
+    ("Pexels: network failure", "network-failure"),
+    ("Pixabay: phản hồi JSON không hợp lệ", "invalid-json"),
+    ("Pixabay: invalid response encoding", "invalid-encoding"),
+    ("Pexels: HTTP 403 ?key=PRIVATE", "unknown-provider-error"),
+    ("PRIVATE_TOKEN url https://example.com/secret", "unknown-provider-error"),
+])
+def test_provider_error_classification_never_echoes_input(message, expected):
+    code = safe_provider_error_code(ProviderError(message))
+    assert code == expected
+    assert "PRIVATE" not in code
+    assert "https://" not in code
+
+
+def test_normal_search_attempt_reports_only_safe_classification():
+    scenes, plan = _plan()
+
+    class AuthorizationFailure(FakeProvider):
+        def search(self, request):
+            self.calls.append(request)
+            raise ProviderError("Pexels: HTTP 403")
+
+    run = _service(AuthorizationFailure("pexels")).search(
+        plan, scenes, SlotSearchOptions(("pexels",)),
+        approve_provider_calls=True,
+    )
+    assert run.provider_calls == 6
+    assert all(
+        attempt.status == "provider-error"
+        and attempt.error_code == "http-403"
+        for result in run.slots for attempt in result.attempts
+    )
