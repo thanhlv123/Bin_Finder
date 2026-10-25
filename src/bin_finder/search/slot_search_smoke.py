@@ -54,7 +54,7 @@ def synthetic_example():
 
 
 def _safe_label(value: str, limit: int = 95) -> str:
-    return " ".join(c for c in value[:limit] if c.isprintable()).strip()
+    return " ".join("".join(c for c in value[:limit] if c.isprintable()).split())
 
 
 def main(argv: list[str] | None = None) -> int:
