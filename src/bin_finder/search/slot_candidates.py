@@ -7,6 +7,7 @@ re-encodes, ranks by vision, modifies production state, or writes user files.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+import re
 from typing import Sequence
 
 from bin_finder.models import CandidateRecord, SceneRecord
@@ -19,6 +20,38 @@ from bin_finder.search.visual_search_contract import (
 
 class SlotSearchError(ValueError):
     """Stable diagnostic code; no provider raw errors or user text are exposed."""
+
+
+_HTTP_PATTERN = re.compile(r"^(?:Pexels|Pixabay): HTTP ([45][0-9]{2})$")
+
+_SAFE_UPSTREAM_ERRORS = {
+    "invalid response encoding": "invalid-encoding",
+    "response too large": "response-too-large",
+    "không thể kết nối mạng": "network-unreachable",
+    "hết thời gian chờ": "timeout",
+    "network failure": "network-failure",
+    "phản hồi JSON không hợp lệ": "invalid-json",
+    "phản hồi không hợp lệ": "invalid-response",
+}
+
+
+def safe_provider_error_code(exc: ProviderError) -> str:
+    """Classify only known sanitized client errors, never print raw exceptions.
+
+    Codes are suitable for public reports, even if an unknown provider raises
+    an exception embedding credentials, query strings or signed media URLs.
+    """
+    value = str(exc)
+    match = _HTTP_PATTERN.fullmatch(value)
+    if match:
+        return "http-" + match.group(1)
+    for name in ("Pexels", "Pixabay"):
+        prefix = name + ": "
+        if value.startswith(prefix):
+            return _SAFE_UPSTREAM_ERRORS.get(
+                value[len(prefix):], "unknown-provider-error"
+            )
+    return "unknown-provider-error"
 
 
 @dataclass(frozen=True)
@@ -73,6 +106,7 @@ class SearchAttempt:
     axis: str
     status: str
     received: int
+    error_code: str = ""
 
 
 @dataclass(frozen=True)
@@ -173,10 +207,10 @@ class SlotCandidateSearch:
                     calls += 1
                     try:
                         response = provider.search(request)
-                    except ProviderError:
+                    except ProviderError as exc:
                         attempts.append(SearchAttempt(
                             slot.slot_id, provider_key, query.axis,
-                            "provider-error", 0,
+                            "provider-error", 0, safe_provider_error_code(exc),
                         ))
                         # Different axes and providers remain eligible.
                         continue
