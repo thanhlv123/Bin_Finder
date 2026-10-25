@@ -77,11 +77,18 @@ def main(argv: list[str] | None = None) -> int:
         "--diagnose-minimal-request", action="store_true",
         help="Send one minimal documented GET with no video size filter",
     )
+    parser.add_argument(
+        "--diagnose-error-body", action="store_true",
+        help="One minimal GET: classify server error body into safe fixed hints",
+    )
     args = parser.parse_args(argv)
-    if args.diagnose_minimal_request and args.diagnose_single_query:
+    if sum(bool(x) for x in (
+        args.diagnose_minimal_request, args.diagnose_single_query,
+        args.diagnose_error_body,
+    )) > 1:
         parser.error("Choose only one diagnostic mode")
-    if args.diagnose_minimal_request and args.provider == "local":
-        parser.error("Minimal HTTP diagnostics support pexels/pixabay only")
+    if (args.diagnose_minimal_request or args.diagnose_error_body) and args.provider == "local":
+        parser.error("HTTP diagnostics support pexels/pixabay only")
     scenes, plan = synthetic_example()
     req = plan.search_requests()[0]
     print("BFS02_MODE:", "APPROVED_PROVIDER_PILOT" if args.approve_provider_calls
@@ -104,6 +111,21 @@ def main(argv: list[str] | None = None) -> int:
 
     # Only explicit opt-in reaches this block or loads private provider config.
     config = ProviderConfig.load(Path(args.project_root))
+    if args.diagnose_error_body:
+        from bin_finder.search.provider_error_probe import probe_minimal_provider
+
+        key = (config.pexels_api_key if args.provider == "pexels"
+               else config.pixabay_api_key)
+        result = probe_minimal_provider(args.provider, key)
+        print("BFS02_DIAGNOSTIC_MODE: SAFE_ERROR_BODY")
+        print("BFS02_PROVIDER:", args.provider)
+        print("BFS02_PROVIDER_CALLS:", result.provider_calls)
+        print("BFS02_DIAGNOSTIC_CODE:", result.status_code)
+        print("BFS02_SERVER_HINT:", result.error_hint or "none")
+        print("BFS02_UNVERIFIED_CANDIDATES:", result.candidate_count)
+        print("BFS02_STATUS: DIAGNOSTIC_ONLY_NO_SELECTION")
+        return 0
+
     if args.diagnose_minimal_request:
         from urllib.request import getproxies
         from bin_finder.providers.base import ProviderError
