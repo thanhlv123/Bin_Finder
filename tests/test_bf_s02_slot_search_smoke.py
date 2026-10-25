@@ -272,3 +272,56 @@ def test_minimal_request_rejects_mutually_exclusive_flags(capsys):
         main(["--diagnose-minimal-request", "--diagnose-single-query"])
     assert exc.value.code == 2
     assert "Choose only one diagnostic mode" in capsys.readouterr().err
+
+
+
+def test_live_pilot_reports_all_ten_fairly_retained_candidates(
+    tmp_path, monkeypatch, capsys
+):
+    class AxisProvider(FakeProvider):
+        def search(self, request):
+            self.calls.append(request)
+            axes = {
+                "fishing boats harbor": "subject",
+                "coastal harbor at dawn": "moment",
+                "fishing vessels entering harbor": "action",
+            }
+            axis = axes[request.query]
+            return ProviderSearchResult(self.key, [
+                CandidateRecord(
+                    candidate_id=request.scene_id + ":" + axis + str(i),
+                    scene_id=request.scene_id,
+                    provider=self.key,
+                    source_id=axis + str(i),
+                    title="Synthetic " + axis + " video " + str(i),
+                    duration=8.0, score=0.0, rights_status="unknown",
+                    resolution="1920x1080",
+                    source_url="https://example.org/private?secret=NEVER_LOG_THIS",
+                    preview_url="https://example.org/asset?token=NEVER_LOG_THIS",
+                )
+                for i in range(5)
+            ])
+    provider = AxisProvider()
+    monkeypatch.setattr(
+        ProviderRegistry, "from_config",
+        classmethod(lambda cls, config: ProviderRegistry([provider])),
+    )
+    assert main([
+        "--provider", "pexels", "--project-root", str(tmp_path),
+        "--approve-provider-calls"
+    ]) == 0
+    output = capsys.readouterr().out
+    lines = output.splitlines()
+    assert len([x for x in lines if x.startswith("BFS02_CANDIDATE:")]) == 10
+    assert "BFS02_UNIQUE_DISCOVERED: 15" in output
+    assert "BFS02_TRIMMED_BY_CAP: 5" in output
+    assert "BFS02_REPORT_ITEMS: 10" in output
+    assert "BFS02_SELECTION_POLICY: balanced-axis-provider-review-pool" in output
+    assert "BFS02_AXIS_COVERAGE: subject discovered=5 kept=4" in output
+    assert "BFS02_AXIS_COVERAGE: moment discovered=5 kept=3" in output
+    assert "BFS02_AXIS_COVERAGE: action discovered=5 kept=3" in output
+    assert "Synthetic action video" in output
+    assert "1920x1080" in output
+    assert len(provider.calls) == 3
+    assert "NEVER_LOG_THIS" not in output
+    assert "https://" not in output
