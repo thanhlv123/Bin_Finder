@@ -100,3 +100,23 @@ mocks the approved provider path in CI; it never sends network traffic.
 ## Next stage — BF-S03
 
 Metadata filters (resolution, duration, suitability, provenance) → sample bounded local video frames → F021 local vision check against `must_show/must_not_show` → rank a **reviewable** top-N candidate pool with evidence explanations; maintain `no_match` for unverifiable content. Human-approved/locked selections remain authoritative. All real provider tests should run in explicit opt-in local research mode, separate from production.
+
+
+## BF-S02 provider connectivity triage (2026-10-26)
+
+On user Windows, the initial BF-S02 live pilot reported `provider-unavailable` for both Pexels and Pixabay and sent 0 API requests. After supplying runtime keys, each provider was called 3 times, but **all 6 attempts failed with `provider-error`** and no candidates. No actual footage relevance can be evaluated until this is resolved.
+
+Research commit adds a bounded `--diagnose-single-query` flag to the same smoke CLI. **Only** in combination with `--approve-provider-calls`, this asks one configured provider **one** synthetic search question (`fishing boats harbor`), with `limit=1`, and prints a safe diagnostic code without URL, API key, HTTP response body or traceback. It does **not** download or select footage.
+
+Examples of allowed output: `http-401`, `http-403`, `http-429`, `http-500`, `network-unreachable`, `timeout`, `invalid-json`, `invalid-response`, `unknown-provider-error`, `not-configured`, `ok`, `empty`. Status reflects a single API call, **not the correctness of searched footage**. Unknown ProviderError messages cannot disclose embedded secrets because only strictly allowlisted patterns are classified; unknowns are reduced to the fixed code.
+
+One-call opt-in test (requires `PYTHONPATH` set to the pinned BF-S02 research worktree and keys available locally):
+
+```powershell
+& $python -m bin_finder.search.slot_search_smoke --provider pexels --project-root 'D:\YouTubeTools\Bin_Finder\Bin_Finder' --diagnose-single-query --approve-provider-calls
+& $python -m bin_finder.search.slot_search_smoke --provider pixabay --project-root 'D:\YouTubeTools\Bin_Finder\Bin_Finder' --diagnose-single-query --approve-provider-calls
+```
+
+The existing per-axis search results also now contain `SearchAttempt.error_code` for supported sanitized `ProviderError` patterns. No production provider/HTTP implementation or GUI is changed. Credentials remain locally configured; **never paste tokens into GitHub, shell command arguments, public reports, or this chat.**
+
+Interpretation: `401/403` suggests authorization, key scope or access rejection; `429` rate limits; `5xx` provider service errors; `network-unreachable/timeout` connectivity; `invalid-json` response format. The same result across both providers may reflect local network/proxy/TLS or incorrectly entered tokens, but **cannot be uniquely diagnosed from the old `provider-error` output**. No automatic retry or key rotation.
