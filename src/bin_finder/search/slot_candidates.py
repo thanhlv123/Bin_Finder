@@ -153,29 +153,43 @@ def _balanced_candidates(
     provider_keys: tuple[str, ...],
     limit: int,
 ) -> tuple[CandidateHit, ...]:
-    """Round-robin by query axis AND source, after slot-local deduplication.
+    """Round-robin query axes with balanced source allocation after slot-local deduplication.
 
     The algorithm selects a review pool, NOT a relevance ranking. Every
     candidate keeps first-seen metadata and its full matched_axes; repeated
     hits count once. A bucket that runs out simply yields to other buckets.
     """
-    buckets: list[list[CandidateHit]] = [
-        [hit for hit in discovered.values()
-         if hit.candidate.provider == provider_key and axis in hit.matched_axes]
+    buckets: dict[tuple[str, str], list[CandidateHit]] = {
+        (axis, provider_key): [
+            hit for hit in discovered.values()
+            if hit.candidate.provider == provider_key and axis in hit.matched_axes
+        ]
         for axis in _QUERY_AXES for provider_key in provider_keys
-    ]
+    }
     chosen: list[CandidateHit] = []
     used: set[tuple[str, str]] = set()
-    # Every sweep either picks at least one new candidate or stops.
+    provider_counts = {key: 0 for key in provider_keys}
+    # An axis gets at most one new hit per sweep. Within that axis,
+    # prefer the provider with the fewest selected hits; tie-break using
+    # the user's explicit provider order. Overlap never duplicates an asset.
     while len(chosen) < limit:
         progress = False
-        for bucket in buckets:
-            candidate = next((item for item in bucket if item.key not in used), None)
-            if candidate is None:
-                continue
-            chosen.append(candidate)
-            used.add(candidate.key)
-            progress = True
+        for axis in _QUERY_AXES:
+            for provider_key in sorted(
+                provider_keys,
+                key=lambda k: (provider_counts[k], provider_keys.index(k)),
+            ):
+                candidate = next(
+                    (item for item in buckets[(axis, provider_key)]
+                     if item.key not in used), None
+                )
+                if candidate is None:
+                    continue
+                chosen.append(candidate)
+                used.add(candidate.key)
+                provider_counts[provider_key] += 1
+                progress = True
+                break
             if len(chosen) >= limit:
                 break
         if not progress:
