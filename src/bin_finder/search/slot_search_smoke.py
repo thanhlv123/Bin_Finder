@@ -1,0 +1,279 @@
+"""BF-S02 safe single-slot smoke. By default this does NOT call providers.
+
+The sample story and visuals are invented, not real user narration.
+Explicit --approve-provider-calls permits only a bounded provider search;
+no assets are downloaded and no frames are uploaded or decoded.
+"""
+from __future__ import annotations
+
+import argparse
+from pathlib import Path
+
+from bin_finder.models import SceneRecord
+from bin_finder.search.visual_search_contract import (
+    FORMAT, parse_semantic_search_plan, script_digest,
+)
+
+
+def synthetic_example():
+    scene = SceneRecord(
+        scene_id="scene_001", order=1,
+        english_text="At dawn fishing boats enter the coastal harbor.",
+    )
+    plan = {
+        "format": FORMAT,
+        "plan_id": "bf_s02_synthetic_single",
+        "source_digest": script_digest((scene,)),
+        "beats": [{
+            "beat_id": "beat1", "scene_ids": ["scene_001"],
+            "meaning": "Introduce the working harbor at daybreak",
+            "anchor_text": scene.english_text,
+            "section_context": "Establish a coastal working location",
+            "metaphor_note": "",
+        }],
+        "slots": [{
+            "slot_id": "slot1", "beat_id": "beat1",
+            "scene_ids": ["scene_001"], "role": "establish",
+            "action": "search", "evidence_type": "contextual",
+            "entity_policy": "contextual",
+            "source_text": scene.english_text,
+            "visual_brief": "Fishing boats entering a harbor at sunrise",
+            "must_show": ["boats", "water", "harbor"],
+            "must_not_show": ["talking head", "indoor studio"],
+            "required_entities": [],
+            "queries": [
+                {"axis": "subject", "text": "fishing boats harbor"},
+                {"axis": "moment", "text": "coastal harbor at dawn"},
+                {"axis": "action", "text": "fishing vessels entering harbor"},
+            ],
+            "reuse_from_slot_id": None,
+            "uncertainty": "Stock may depict a different harbor.",
+        }],
+    }
+    return (scene,), parse_semantic_search_plan(plan, (scene,))
+
+
+def _safe_label(value: str, limit: int = 95) -> str:
+    return " ".join("".join(c for c in value[:limit] if c.isprintable()).split())
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="BF-S02 single-slot candidate discovery pilot (no downloads)"
+    )
+    parser.add_argument("--provider", choices=("pexels", "pixabay", "local"),
+                        default="pexels")
+    parser.add_argument("--project-root", default=".",
+                        help="Directory with optional config/providers.local.json")
+    parser.add_argument(
+        "--approve-provider-calls", action="store_true",
+        help="Explicitly authorize up to 3 configured-provider search calls",
+    )
+    parser.add_argument(
+        "--diagnose-single-query", action="store_true",
+        help="Send at most one search query and print ONLY safe error codes",
+    )
+    parser.add_argument(
+        "--diagnose-minimal-request", action="store_true",
+        help="Send one minimal documented GET with no video size filter",
+    )
+    parser.add_argument(
+        "--diagnose-error-body", action="store_true",
+        help="One minimal GET: classify server error body into safe fixed hints",
+    )
+    args = parser.parse_args(argv)
+    if sum(bool(x) for x in (
+        args.diagnose_minimal_request, args.diagnose_single_query,
+        args.diagnose_error_body,
+    )) > 1:
+        parser.error("Choose only one diagnostic mode")
+    if (args.diagnose_minimal_request or args.diagnose_error_body) and args.provider == "local":
+        parser.error("HTTP diagnostics support pexels/pixabay only")
+    scenes, plan = synthetic_example()
+    req = plan.search_requests()[0]
+    print("BFS02_MODE:", "APPROVED_PROVIDER_PILOT" if args.approve_provider_calls
+          else "OFFLINE_PLAN_ONLY")
+    print("BFS02_SLOT:", req.slot_id)
+    print("BFS02_QUERIES:", ", ".join(
+        q.axis + ": " + q.text for q in req.queries
+    ))
+    print("BFS02_NO_DOWNLOAD_OR_VISION: True")
+
+    if not args.approve_provider_calls:
+        print("BFS02_STATUS: NO_PROVIDER_CALLS")
+        return 0
+
+    from bin_finder.provider_config import ProviderConfig
+    from bin_finder.providers.registry import ProviderRegistry
+    from bin_finder.search.slot_candidates import (
+        SlotCandidateSearch, SlotSearchOptions, safe_provider_error_code,
+    )
+
+    # Only explicit opt-in reaches this block or loads private provider config.
+    config = ProviderConfig.load(Path(args.project_root))
+    if args.diagnose_error_body:
+        from bin_finder.search.provider_error_probe import probe_minimal_provider
+
+        key = (config.pexels_api_key if args.provider == "pexels"
+               else config.pixabay_api_key)
+        result = probe_minimal_provider(args.provider, key)
+        print("BFS02_DIAGNOSTIC_MODE: SAFE_ERROR_BODY")
+        print("BFS02_PROVIDER:", args.provider)
+        print("BFS02_PROVIDER_CALLS:", result.provider_calls)
+        print("BFS02_DIAGNOSTIC_CODE:", result.status_code)
+        print("BFS02_SERVER_HINT:", result.error_hint or "none")
+        print("BFS02_UNVERIFIED_CANDIDATES:", result.candidate_count)
+        print("BFS02_STATUS: DIAGNOSTIC_ONLY_NO_SELECTION")
+        return 0
+
+    if args.diagnose_minimal_request:
+        from urllib.request import getproxies
+        from bin_finder.providers.base import ProviderError
+        from bin_finder.providers.http import JsonHttpClient
+
+        api_key = (config.pexels_api_key if args.provider == "pexels"
+                   else config.pixabay_api_key)
+        if not api_key:
+            code = "not-configured"
+            calls = 0
+            count = 0
+        else:
+            if args.provider == "pexels":
+                endpoint = "https://api.pexels.com/v1/videos/search"
+                params = {"query": "nature", "per_page": 1}
+                headers = {"Authorization": api_key}
+                provider_name = "Pexels"
+                result_field = "videos"
+            else:
+                endpoint = "https://pixabay.com/api/videos/"
+                params = {"key": api_key, "q": "nature", "per_page": 3}
+                headers = {}
+                provider_name = "Pixabay"
+                result_field = "hits"
+            calls = 1
+            count = 0
+            try:
+                data = JsonHttpClient().get_json(
+                    endpoint, params=params, headers=headers,
+                    provider_name=provider_name, timeout=15.0,
+                )
+                rows = data.get(result_field)
+                if not isinstance(rows, list):
+                    code = "invalid-provider-result"
+                else:
+                    count = len(rows)
+                    code = "ok" if count else "empty"
+            except ProviderError as exc:
+                code = safe_provider_error_code(exc)
+            except Exception:
+                # Never serialize urllib exception or full URL; Pixabay
+                # includes the API key in the request query string.
+                code = "unexpected-provider-exception"
+        # Print shape issues only. Never print key content, hash, or URL.
+        if not api_key:
+            key_shape = "missing"
+        elif api_key.lower().startswith("bearer "):
+            key_shape = "bearer-prefix"
+        elif api_key.lower().startswith("key="):
+            key_shape = "key-equals-prefix"
+        elif (api_key[:1] in ("'", '"') or api_key[-1:] in ("'", '"')):
+            key_shape = "surrounding-quotes"
+        elif api_key.upper() in ("YOUR_API_KEY", "API_KEY", "INSERT_KEY_HERE"):
+            key_shape = "placeholder-like"
+        else:
+            key_shape = "unverified"
+        print("BFS02_DIAGNOSTIC_MODE: MINIMAL_REQUEST")
+        print("BFS02_PROVIDER:", args.provider)
+        print("BFS02_PROVIDER_CALLS:", calls)
+        print("BFS02_KEY_SHAPE:", key_shape)
+        print("BFS02_PROXY_CONFIG_PRESENT:", bool(getproxies()))
+        print("BFS02_DIAGNOSTIC_CODE:", code)
+        print("BFS02_UNVERIFIED_CANDIDATES:", count)
+        print("BFS02_STATUS: DIAGNOSTIC_ONLY_NO_SELECTION")
+        return 0
+
+    registry = ProviderRegistry.from_config(config)
+    if args.diagnose_single_query:
+        from bin_finder.providers.base import (
+            ProviderError, ProviderSearchResult, SearchRequest,
+        )
+        source = registry.get(args.provider)
+        code = "not-configured"
+        count = 0
+        calls = 0
+        if source is not None:
+            try:
+                ready = source.status().configured
+            except Exception:
+                ready = False
+                code = "invalid-provider-status"
+            if ready:
+                calls = 1
+                try:
+                    response = source.search(SearchRequest(
+                        scene_id=scenes[0].scene_id,
+                        query=req.queries[0].text,
+                        limit=1,
+                        min_height=720,
+                    ))
+                except ProviderError as exc:
+                    code = safe_provider_error_code(exc)
+                except Exception:
+                    # Do not serialize exception text or traceback; adapters
+                    # may contain HTTP URLs with API keys as query params.
+                    code = "unexpected-provider-exception"
+                else:
+                    if (isinstance(response, ProviderSearchResult)
+                            and response.provider_key == args.provider
+                            and isinstance(response.candidates, list)):
+                        count = len(response.candidates[:1])
+                        code = "ok" if count else "empty"
+                    else:
+                        code = "invalid-provider-result"
+        print("BFS02_DIAGNOSTIC_MODE: SINGLE_QUERY")
+        print("BFS02_PROVIDER_CALLS:", calls)
+        print("BFS02_DIAGNOSTIC_CODE:", code)
+        print("BFS02_UNVERIFIED_CANDIDATES:", count)
+        print("BFS02_STATUS: DIAGNOSTIC_ONLY_NO_SELECTION")
+        return 0
+
+    results = SlotCandidateSearch(registry).search(
+        plan, scenes,
+        SlotSearchOptions(
+            (args.provider,), per_query_limit=5,
+            max_candidates_per_slot=10, max_calls=3,
+        ),
+        approve_provider_calls=True,
+    )
+    item = results.slot("slot1")
+    print("BFS02_PROVIDER_CALLS:", results.provider_calls)
+    print("BFS02_SLOT_STATUS:", item.status)
+    print("BFS02_UNVERIFIED_CANDIDATES:", len(item.hits))
+    print("BFS02_UNIQUE_DISCOVERED:", item.unique_discovered)
+    print("BFS02_TRIMMED_BY_CAP:", item.trimmed_by_cap)
+    print("BFS02_SELECTION_POLICY: balanced-axis-provider-review-pool")
+    for axis, discovered_count in item.axis_discovered:
+        kept_count = sum(axis in hit.matched_axes for hit in item.hits)
+        print("BFS02_AXIS_COVERAGE:", axis, "discovered=" + str(discovered_count),
+              "kept=" + str(kept_count))
+    for attempt in item.attempts:
+        print("BFS02_ATTEMPT:", attempt.axis, attempt.status,
+              attempt.received, attempt.error_code)
+    # Print the ENTIRE bounded review pool (not just top five). This remains
+    # unranked, unverified footage metadata; exclude signed URLs and payloads.
+    print("BFS02_REPORT_ITEMS:", len(item.hits))
+    for number, hit in enumerate(item.hits, 1):
+        print("BFS02_CANDIDATE:", "rank=" + str(number),
+              _safe_label(hit.candidate.title, 160),
+              "source=" + _safe_label(hit.candidate.source_id, 80),
+              "provider=" + _safe_label(hit.candidate.provider, 40),
+              "axes=" + ",".join(hit.matched_axes),
+              "duration=" + _safe_label(str(hit.candidate.duration), 20),
+              "resolution=" + _safe_label(hit.candidate.resolution or "unknown", 30),
+              "rights=" + _safe_label(hit.candidate.rights_status, 40))
+    print("BFS02_STATUS: COMPLETED_UNVERIFIED_NO_SELECTION")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
