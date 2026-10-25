@@ -215,7 +215,7 @@ def test_unknown_provider_is_reported_not_guessed_or_silently_replaced():
         approve_provider_calls=True
     )
     assert run.provider_calls == 0
-    assert run.slot("s1").status == "no-candidates-found"
+    assert run.slot("s1").status == "provider-unavailable"
     assert all(a.status == "not-configured" for a in run.slot("s1").attempts)
 
 
@@ -329,3 +329,41 @@ def test_unreviewed_candidate_cannot_be_locked_or_crossed_into_wrong_slot():
     ))
     with pytest.raises(SlotSearchError, match="cross-slot-candidate"):
         pool.apply_run(forged)
+
+
+
+def test_provider_contract_error_is_not_misreported_as_no_matching_footage():
+    scenes, plan = _plan()
+
+    class MalformedProvider(FakeProvider):
+        def search(self, request):
+            self.calls.append(request)
+            return ProviderSearchResult("wrong-provider", [])
+
+    fake = MalformedProvider("pexels")
+    run = _service(fake).search(
+        plan, scenes, SlotSearchOptions(("pexels",)),
+        approve_provider_calls=True
+    )
+    assert run.slot("s1").hits == ()
+    assert run.slot("s1").status == "technical-error-no-candidates"
+    assert all(a.status == "invalid-provider-result"
+               for a in run.slot("s1").attempts)
+    assert len(fake.calls) == 6
+
+
+def test_real_empty_search_is_distinct_from_technical_failure():
+    scenes, plan = _plan()
+
+    class EmptyProvider(FakeProvider):
+        def search(self, request):
+            self.calls.append(request)
+            return ProviderSearchResult(self.key, [])
+
+    fake = EmptyProvider("pexels")
+    run = _service(fake).search(
+        plan, scenes, SlotSearchOptions(("pexels",)),
+        approve_provider_calls=True
+    )
+    assert run.slot("s1").status == "no-candidates-found"
+    assert all(a.status == "empty" for a in run.slot("s1").attempts)
