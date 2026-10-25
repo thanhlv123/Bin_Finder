@@ -153,3 +153,122 @@ def test_diagnostic_redacts_unknown_exception_and_signed_urls(
     assert secret not in output
     assert "https://signed" not in output
     assert len(provider.calls) == 1
+
+
+
+def test_minimal_pexels_request_uses_only_documented_basics(
+    tmp_path, monkeypatch, capsys
+):
+    from bin_finder.provider_config import ProviderConfig
+    from bin_finder.providers.http import JsonHttpClient
+
+    monkeypatch.setattr(
+        ProviderConfig, "load",
+        classmethod(lambda cls, root: ProviderConfig(
+            pexels_api_key="PEXELS_TEST_SECRET",
+        )),
+    )
+    calls = []
+
+    def fake_get(self, base_url, **kwargs):
+        calls.append((base_url, kwargs))
+        return {"videos": [{"id": "synthetic"}]}
+
+    monkeypatch.setattr(JsonHttpClient, "get_json", fake_get)
+    assert main(["--provider", "pexels", "--project-root", str(tmp_path),
+                 "--diagnose-minimal-request", "--approve-provider-calls"]) == 0
+    assert len(calls) == 1
+    url, kwargs = calls[0]
+    assert url == "https://api.pexels.com/v1/videos/search"
+    assert kwargs["params"] == {"query": "nature", "per_page": 1}
+    assert kwargs["headers"] == {"Authorization": "PEXELS_TEST_SECRET"}
+    assert kwargs["timeout"] == 15.0
+    out = capsys.readouterr().out
+    assert "MINIMAL_REQUEST" in out
+    assert "BFS02_PROVIDER_CALLS: 1" in out
+    assert "BFS02_DIAGNOSTIC_CODE: ok" in out
+    assert "PEXELS_TEST_SECRET" not in out
+    assert "https://" not in out
+
+
+def test_minimal_pixabay_request_uses_no_size_filters_and_redacts_key(
+    tmp_path, monkeypatch, capsys
+):
+    from bin_finder.provider_config import ProviderConfig
+    from bin_finder.providers.http import JsonHttpClient
+
+    monkeypatch.setattr(
+        ProviderConfig, "load",
+        classmethod(lambda cls, root: ProviderConfig(
+            pixabay_api_key="PIXABAY_TEST_SECRET",
+        )),
+    )
+    calls = []
+
+    def fake_get(self, base_url, **kwargs):
+        calls.append((base_url, kwargs))
+        return {"hits": []}
+
+    monkeypatch.setattr(JsonHttpClient, "get_json", fake_get)
+    assert main(["--provider", "pixabay", "--project-root", str(tmp_path),
+                 "--diagnose-minimal-request", "--approve-provider-calls"]) == 0
+    assert len(calls) == 1
+    url, kwargs = calls[0]
+    assert url == "https://pixabay.com/api/videos/"
+    assert kwargs["params"] == {
+        "key": "PIXABAY_TEST_SECRET", "q": "nature", "per_page": 3,
+    }
+    assert kwargs["headers"] == {}
+    out = capsys.readouterr().out
+    assert "BFS02_PROVIDER_CALLS: 1" in out
+    assert "BFS02_DIAGNOSTIC_CODE: empty" in out
+    assert "PIXABAY_TEST_SECRET" not in out
+    assert "https://" not in out
+
+
+def test_minimal_request_is_offline_without_approval(tmp_path, monkeypatch, capsys):
+    from bin_finder.provider_config import ProviderConfig
+
+    def never(*args, **kwargs):
+        raise AssertionError("Config loaded without explicit approval")
+
+    monkeypatch.setattr(ProviderConfig, "load", classmethod(never))
+    assert main(["--provider", "pixabay", "--project-root", str(tmp_path),
+                 "--diagnose-minimal-request"]) == 0
+    assert "BFS02_STATUS: NO_PROVIDER_CALLS" in capsys.readouterr().out
+
+
+def test_minimal_request_classifies_400_without_exposing_credentials(
+    tmp_path, monkeypatch, capsys
+):
+    from bin_finder.provider_config import ProviderConfig
+    from bin_finder.providers.http import JsonHttpClient
+
+    monkeypatch.setattr(
+        ProviderConfig, "load",
+        classmethod(lambda cls, root: ProviderConfig(
+            pixabay_api_key="PIXABAY_SECRET_400",
+        )),
+    )
+    calls = []
+
+    def fake_get(self, base_url, **kwargs):
+        calls.append(kwargs)
+        raise ProviderError("Pixabay: HTTP 400")
+
+    monkeypatch.setattr(JsonHttpClient, "get_json", fake_get)
+    assert main(["--provider", "pixabay", "--project-root", str(tmp_path),
+                 "--diagnose-minimal-request", "--approve-provider-calls"]) == 0
+    output = capsys.readouterr().out
+    assert len(calls) == 1
+    assert "BFS02_DIAGNOSTIC_CODE: http-400" in output
+    assert "PIXABAY_SECRET_400" not in output
+    assert "BFS02_STATUS: DIAGNOSTIC_ONLY_NO_SELECTION" in output
+
+
+def test_minimal_request_rejects_mutually_exclusive_flags(capsys):
+    import pytest
+    with pytest.raises(SystemExit) as exc:
+        main(["--diagnose-minimal-request", "--diagnose-single-query"])
+    assert exc.value.code == 2
+    assert "Choose only one diagnostic mode" in capsys.readouterr().err
