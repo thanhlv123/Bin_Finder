@@ -120,3 +120,29 @@ One-call opt-in test (requires `PYTHONPATH` set to the pinned BF-S02 research wo
 The existing per-axis search results also now contain `SearchAttempt.error_code` for supported sanitized `ProviderError` patterns. No production provider/HTTP implementation or GUI is changed. Credentials remain locally configured; **never paste tokens into GitHub, shell command arguments, public reports, or this chat.**
 
 Interpretation: `401/403` suggests authorization, key scope or access rejection; `429` rate limits; `5xx` provider service errors; `network-unreachable/timeout` connectivity; `invalid-json` response format. The same result across both providers may reflect local network/proxy/TLS or incorrectly entered tokens, but **cannot be uniquely diagnosed from the old `provider-error` output**. No automatic retry or key rotation.
+
+
+## BF-S02 minimal request isolation after HTTP 400 on both providers
+
+The next user report showed `http-400` from both Pexels and Pixabay even with recognized runtime credentials. **This alone cannot prove bad credentials or bad query parameters.** Cross-check against the official provider API documentation:
+
+- Pexels video search: `GET https://api.pexels.com/v1/videos/search`, `query` required, `per_page=1` accepted; `Authorization` must directly contain the API key without `Bearer`.
+- Pixabay video search: `GET https://pixabay.com/api/videos/`, `key` required, `q` optional and `per_page` minimum 3. `min_height` is supported by videos. Queries are URL encoded by existing `JsonHttpClient`.
+
+To isolate whether the **current optional size/search filters** trigger the error, a separate `--diagnose-minimal-request` mode sends **exactly one** documented minimal authenticated request:
+
+```powershell
+& $python -m bin_finder.search.slot_search_smoke --provider pexels --project-root 'D:\YouTubeTools\Bin_Finder\Bin_Finder' --diagnose-minimal-request --approve-provider-calls
+& $python -m bin_finder.search.slot_search_smoke --provider pixabay --project-root 'D:\YouTubeTools\Bin_Finder\Bin_Finder' --diagnose-minimal-request --approve-provider-calls
+```
+
+Neither mode sends any request without explicit `--approve-provider-calls`. The minimal requests use **synthetic** `nature` rather than private narration:
+
+- Pexels: `query=nature`, `per_page=1`; no size/orientation filter.
+- Pixabay: `q=nature`, `per_page=3`; no size/video type/safesearch filter.
+- Response never includes raw URL, API key, response body, exception trace or candidate metadata. Prints only `BFS02_PROVIDER_CALLS`, `BFS02_DIAGNOSTIC_CODE`, safe `BFS02_KEY_SHAPE` (if obvious accidentally entered `Bearer`, `key=`, quotes or placeholder), and `BFS02_PROXY_CONFIG_PRESENT` boolean (never proxy URL/user/password).
+- `ok` means the API returned one or more **unverified candidates**, `empty` means no hits. Errors preserve the strict known-code allowlist: e.g. `http-400`, `http-401`, `http-403`, `network-unreachable`, `timeout`, `unknown-provider-error`.
+
+**Interpretation:** if the simple request succeeds while the ordinary request fails, inspect optional request parameters. If **both still produce 400**, do *not* keep blindly changing search keywords; inspect whether credentials were copied to the correct provider and whether the network/proxy modifies requests. HTTP response bodies are intentionally hidden to prevent leaking Pixabay's query parameter key. The proxy boolean is a clue, not proof of a proxy-caused error.
+
+The new tests mock the HTTP client; they do **not** hit either provider on GitHub CI.
