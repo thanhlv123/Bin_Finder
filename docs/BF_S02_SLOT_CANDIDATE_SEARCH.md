@@ -1,0 +1,68 @@
+# BF-S02 — Visual Slot Candidate Search (research-only)
+
+**Branch:** `research/bf-s02-slot-candidate-search`, **stacked on BF-S01** `research/bf-s01-visual-search-contract`. This is an independent implementation inspired by Z5 workflow *principles* established by the user's static analysis, NOT a port of Z5 proprietary binaries or reconstructed source.
+
+## Goal and scope
+
+Consume a **validated** BF-S01 `SemanticSearchPlan` to retrieve provider candidates per visual slot, while preserving the human's review choices. The contract separates **subject**, **moment** and **action** queries. `hold`, `transition`, `graphic` and `no_match` do **not** create a provider request.
+
+```
+Validated BF-S01 SemanticSearchPlan
+  ├─ search slot-1 ─ subject/moment/action ─ providers ─ candidate pool slot-1
+  ├─ transition slot-2 ─ no provider call ─ editorial review marker
+  └─ search slot-3 ─ subject/moment/action ─ providers ─ candidate pool slot-3
+         ↓
+  CandidateReviewPool (immutable; manual choices and locks are protected)
+         ↓
+  Future BF-S03 metadata/vision reranking
+         ↓
+  Future BF-S04 Human Review Timeline
+```
+
+**Implemented research modules**
+
+- `src/bin_finder/search/slot_candidates.py`: `SlotCandidateSearch.search(plan, scenes, options, approve_provider_calls=True)` uses the preexisting `ProviderRegistry` and `providers.base.SearchRequest` without changing any provider or legacy `DiscoveryService.search_scene`. **Without explicit approval it refuses all provider calls.** It verifies the BF-S01 plan against unchanged narration before making calls.
+- Each of the three query axes is submitted independently to every requested configured provider (one search per axis/provider/slot). A bounded budget of up to **18 planned calls** per invocation prevents unintentional broad searches. No retries, downloads, background tasks or video decoding occur. A failed source/query is recorded with a bounded status; other axes/providers can still yield candidates.
+- `CandidateHit` stores `slot_id`, `beat_id`, all mapped `scene_ids`, provider-origin `CandidateRecord`, matched query axes and deterministic first-seen order. Dedupe uses `(provider, source_id)` **within the same slot only**. Identical media from different slots remains independently reviewable. Native provider `CandidateRecord.scene_id` stays the initial scene ID because the existing provider API is scene-based; the outer wrapper carries authoritative slot identity.
+- `SearchAttempt` statuses are only `ok/empty/provider-error/not-configured/invalid-provider-status/invalid-provider-result`, and never embed raw exception text or credentials. Provider title/metadata and `rights_status` remain **unverified and not a license approval**.
+- `src/bin_finder/search/slot_review_pool.py`: immutable `CandidateReviewPool` keeps *all* original slot actions (including editorial-only actions) and their new candidates. **There is no automatic winner.** A human explicitly calls `choose`, `mark_reviewed` (layout-only), then optional `set_lock`. Locks cannot be overwritten by a new search. Even if a selected unlocked asset disappears from later result lists, it is retained and flagged `selection_retained_after_search=True` for verification; it is never silently substituted.
+
+**Key limitations**
+
+1. BF-S02 collects candidates; **it does not rank them semantically**. A provider's existing numerical score is not proof of relevance. Insertion order is a deterministic research ordering only. BF-S03 will compare metadata + real video frames with the visual constraints.
+2. The adapter does not change the old scene-based discovery pipeline, the GUI, existing producer, F014 approvals, F021 verification, acquisition, CapCut or the timeline. The human review pool is only in-memory, not yet persisted.
+3. A technical error is **not** semantic `no_match`; all missing candidate cases remain `no-candidates-found` or `technical-error-no-candidates`. No invented fallback footage.
+4. No model is called to create BF-S01 plans at this phase. Synthetic plans are supplied by tests; actual user scripts stay local.
+5. Live provider searches are possible **only** when a caller explicitly approves them and supplies configured providers. Any API service request may consume provider quota. Follow each provider's licensing/terms independently.
+6. The service does not copy/rewrite/modify provider credentials, never includes API keys in diagnostics and does not upload frames or video.
+7. Other editors/research PRs (BF-S01 PR #33, ZB-01 #30, ZB-02 #31, ZB-03A #32, F021 #29) are unchanged; **no merge**.
+
+## Offline tests and acceptance gates
+
+`tests/test_bf_s02_slot_candidates.py` uses only invented sample narration and fake Pexels/Pixabay providers. It asserts:
+
+- explicit opt-in must be present **before** any provider call;
+- 3 query axes are sent separately and each call is attributed to its slot;
+- duplicate assets are merged within one slot but **not between** two slots;
+- provider error text is not disclosed; failures cannot cause a random winner;
+- disabled, missing, mismatched or stale provider data is handled without cross-slot mutation;
+- a user's reviewed or locked choice cannot be silently overwritten;
+- non-search editorial slots do not cause requests and remain visible in the pool;
+- bounded call budget, stale-script invalidation and invalid inputs fail closed;
+- no AI, internet request, download or FFmpeg is needed to run the offline suite.
+
+Full Windows CI should also run inherited BF-S01 tests and production legacy regressions.
+
+## Local offline check (only if a Windows research worktree has been created)
+
+```powershell
+$python = 'D:\YouTubeTools\Bin_Finder\Bin_Finder\.venv\Scripts\python.exe'
+$env:PYTHONPATH = 'D:\YouTubeTools\Bin_Finder_BFS02_Research\src'
+& $python -m pytest -q 'D:\YouTubeTools\Bin_Finder_BFS02_Research\tests\test_bf_s02_slot_candidates.py'
+```
+
+A separate CLI opt-in live-provider pilot and real footage precision@3 / precision@5 benchmarks are follow-up acceptance gates. **Do not claim footage relevance improvement or automated timeline usability based on these tests.**
+
+## Next stage — BF-S03
+
+Metadata filters (resolution, duration, suitability, provenance) → sample bounded local video frames → F021 local vision check against `must_show/must_not_show` → rank a **reviewable** top-N candidate pool with evidence explanations; maintain `no_match` for unverifiable content. Human-approved/locked selections remain authoritative. All real provider tests should run in explicit opt-in local research mode, separate from production.
