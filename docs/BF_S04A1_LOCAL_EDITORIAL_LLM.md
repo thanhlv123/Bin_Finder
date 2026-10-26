@@ -45,3 +45,17 @@ BF-S04A.2: introduce an authorized **arbitrary user-script input** (non-fixture)
 - New offline regression cases explicitly model the observed wrong/missing-format issue, check deterministic trusted envelope, absence of network without approval, one fake loopback request with shot-only reply, no invented shot content, and rejection of forged rights.
 
 **Not claimed:** no second real Ollama result yet; a model may still fail other shot-level fields, or produce weak editorial plans even if structurally valid. No hidden model retries, no weakening of factual/rights approval, no external data calls. User-local follow-up test required on new commit before changing wider pipeline.
+
+
+## BF-S04A.1R2 — observed `invalid-shot-language`, bounded language compatibility
+
+**User-local acceptance evidence (2026-10-26):** checked out `cecb28a0ff8af35dd94eb9661185bf886d9c298b`, ran **39 focused tests PASS** and zero-call dry-run; explicitly authorized one local `qwen3-vl:4b-instruct` text inference for the same Savoie slot. The result was `local-model-shot-plan-rejected`, `invalid-shot-language`; no JSON file was produced and no media/remote provider touched. This proves only that at least one returned `search_queries[].language` field was not one of the allowed ISO codes. The raw model response is not recorded, so **the exact invalid value is unknown**.
+
+**Scoped correction:**
+- Text prompt now explicitly requests an ISO two-letter lowercase code `en`, `fr`, `vi`, `es` or `de` and warns not to use `English`, `French`, uppercase `EN` or locale variants like `en-US`.
+- Model-only adapter canonically converts **only explicitly mapped unambiguous labels** such as `English` → `en`, `French`/`français` → `fr`, `German` → `de`, `Spanish` → `es`, `Vietnamese` → `vi`, plus the corresponding case differences in ISO codes. This is not machine translation or content inference. Unknown/missing/malformed or ambiguous language labels are **still rejected** with `invalid-shot-language`.
+- Normalization takes place in a deep copy before invoking the **unchanged canonical** BF-S04A validator; the canonical schema itself is not relaxed. The original model response is not overwritten, user script and queries are not translated, and shot-level visual briefs, grounded source anchors, `must_show`/`must_not_show`, factual status, rights and approval are **never repaired**.
+- New audited field `BFS04A1_LANGUAGE_LABELS_NORMALIZED` reports how many exact labels were transformed on successful model output; no raw untrusted labels, source text or paths are printed.
+- New offline tests cover allowed aliases; malformed locale tags `en-US`, unsupported languages, null/numeric labels, preserving source input, never granting rights, no automatic retry, one fake Ollama request and prompt instructions.
+
+**Acceptance:** Windows CI on final head plus user-local focused tests and one separately authorized re-run. If still `invalid-shot-language`, report this exact limitation; do not broaden mappings or guess a language without data. If a new validation reason appears, fix it only after it is grounded by test evidence.
