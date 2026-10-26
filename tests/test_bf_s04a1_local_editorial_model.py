@@ -1,0 +1,252 @@
+"""BF-S04A.1 local text planner safety and contract gates: fully offline."""
+from __future__ import annotations
+
+import io
+import json
+import urllib.error
+from dataclasses import replace
+
+import pytest
+
+from bin_finder.search.editorial_local_model import (
+    LocalEditorialConfig, LocalEditorialConfigError, LocalEditorialOutcome,
+    OllamaLocalEditorialPlanner, parse_local_editorial_reply,
+)
+from bin_finder.search.editorial_local_smoke import main, selected_excerpt
+from bin_finder.search.editorial_shot_plan import EditorialShotPlanError
+from bin_finder.search.editorial_shot_smoke import source_and_base, proposed_shots
+
+
+class Response(io.BytesIO):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.close()
+
+
+class FakeOpener:
+    def __init__(self, message):
+        self.calls = []
+        self.message = message
+
+    def open(self, request, timeout=None):
+        self.calls.append((request, timeout))
+        if isinstance(self.message, Exception):
+            raise self.message
+        return Response(self.message)
+
+
+def draft_for_slot(slot=2):
+    _, full = source_and_base()
+    scenes, mini = selected_excerpt(slot)
+    payload = proposed_shots(full)
+    payload["source_digest"] = mini.source_digest
+    payload["shots"] = [
+        item for item in payload["shots"] if item["slot_id"] == f"slot{slot}"
+    ]
+    return scenes, mini, payload
+
+
+def wrapped(value):
+    return json.dumps({"message": {"content": value}}).encode("utf-8")
+
+
+def fake_client(reply):
+    opener = FakeOpener(wrapped(reply))
+    return OllamaLocalEditorialPlanner(opener=opener), opener
+
+
+def test_one_slot_editorial_draft_roundtrip_from_real_french_excerpt():
+    scenes, base, draft = draft_for_slot()
+    plan = parse_local_editorial_reply(
+        json.dumps(draft, ensure_ascii=False), base, scenes
+    )
+    assert len(plan.shots) == 3
+    assert all(s.slot_id == "slot2" for s in plan.shots)
+    assert sum(s.target_duration_seconds for s in plan.shots) == 7
+    assert all(s.factual_status == "unverified" for s in plan.shots)
+    assert all(s.rights_status == "pending" for s in plan.shots)
+    assert not any(s.timeline_approved for s in plan.shots)
+    assert set(plan.route_counts()) == {"contextual_stock_search"}
+
+
+def test_without_explicit_approval_has_no_network_even_with_fake_opener():
+    scenes, base, draft = draft_for_slot()
+    client, opener = fake_client(json.dumps(draft))
+    result = client.propose(base, scenes)
+    assert result.status == "local-model-approval-required"
+    assert result.calls_attempted == 0
+    assert opener.calls == []
+    assert result.plan is None
+
+
+def test_approved_success_is_one_loopback_text_request_and_no_media_payload():
+    scenes, base, draft = draft_for_slot(1)
+    client, opener = fake_client(json.dumps(draft, ensure_ascii=False))
+    result = client.propose(base, scenes, approve_local_model_call=True)
+    assert result.plan is not None
+    assert result.status == "local-shot-plan-proposed-human-review"
+    assert result.calls_attempted == 1
+    assert result.confirmed_http_requests == "unknown"
+    assert result.provider_calls == result.cloud_uploads == result.media_downloads == 0
+    assert result.timeline_approved is False
+    assert len(opener.calls) == 1
+    request, timeout = opener.calls[0]
+    assert timeout == 180
+    assert request.full_url == "http://127.0.0.1:11434/api/chat"
+    assert request.get_method() == "POST"
+    body = json.loads(request.data)
+    assert body["model"] == "qwen3-vl:4b-instruct"
+    assert body["stream"] is False and body["format"] == "json"
+    assert body["options"] == {
+        "temperature": 0, "seed": 0, "num_ctx": 8192,
+        "num_predict": 4096,
+    }
+    assert "images" not in body["messages"][0]
+    assert "Gaspard Ulliel." in body["messages"][0]["content"]
+    assert "license" in body["messages"][0]["content"].lower()
+    assert not any(k.lower() == "authorization" for k in request.headers)
+
+
+@pytest.mark.parametrize("remote", [
+    "http://example.com:11434", "http://192.168.1.9:11434",
+    "https://127.0.0.1:11434", "http://localhost:11434/private",
+    "http://127.0.0.1.evil.com", "http://user:pass@127.0.0.1",
+])
+def test_disallow_remote_untrusted_or_credentialed_model_endpoints(remote):
+    with pytest.raises(ValueError):
+        OllamaLocalEditorialPlanner(LocalEditorialConfig(url=remote))
+
+
+@pytest.mark.parametrize("kw", [
+    {"model": "cloud:latest"},
+    {"num_predict": 8192},
+    {"num_ctx": 2000},
+    {"num_predict": -1},
+    {"timeout_seconds": float("nan")},
+    {"timeout_seconds": 0},
+])
+def test_unsupported_models_and_unbounded_settings_rejected(kw):
+    with pytest.raises((LocalEditorialConfigError, ValueError)):
+        OllamaLocalEditorialPlanner(LocalEditorialConfig(**kw))
+
+
+@pytest.mark.parametrize("reply,reason", [
+    ("", "empty-local-model-reply"),
+    ("I have generated three shots", "invalid-local-model-json"),
+    ("[]", "invalid-local-model-object"),
+    ('{"shots":[],"shots":[]}', "invalid-local-model-json"),
+    ('{"shots": NaN}', "invalid-local-model-json"),
+    ('{"format":"bad","shots":[]}', "invalid-shot-format"),
+])
+def test_invalid_model_output_is_refused_without_auto_repair(reply, reason):
+    scenes, base, _ = draft_for_slot()
+    with pytest.raises(EditorialShotPlanError, match=reason):
+        parse_local_editorial_reply(reply, base, scenes)
+
+
+def test_forged_rights_or_event_evidence_is_rejected_after_single_request():
+    scenes, base, draft = draft_for_slot(1)
+    draft["shots"][0]["rights_status"] = "approved"
+    client, opener = fake_client(json.dumps(draft))
+    result = client.propose(base, scenes, approve_local_model_call=True)
+    assert result.status == "local-model-shot-plan-rejected"
+    assert result.reject_reason == "forged-rights-approval"
+    assert result.plan is None
+    assert len(opener.calls) == 1
+
+
+def test_empty_thinking_reply_does_not_become_valid_plan():
+    client, opener = fake_client("")
+    scenes, base, _ = draft_for_slot()
+    result = client.propose(base, scenes, approve_local_model_call=True)
+    assert result.plan is None
+    assert result.reject_reason == "empty-local-model-reply"
+    assert len(opener.calls) == 1
+
+
+def test_http_timeout_never_retries_or_leaks_details():
+    opener = FakeOpener(urllib.error.URLError("SECRET_REMOTE_URL_AND_KEYS"))
+    client = OllamaLocalEditorialPlanner(opener=opener)
+    scenes, base, _ = draft_for_slot()
+    result = client.propose(base, scenes, approve_local_model_call=True)
+    assert result.status == "local-model-unavailable"
+    assert result.calls_attempted == 1
+    assert len(opener.calls) == 1
+    assert "SECRET" not in repr(result)
+
+
+def test_oversized_model_reply_is_rejected_before_json_parser():
+    scenes, base, _ = draft_for_slot()
+    client = OllamaLocalEditorialPlanner(
+        opener=FakeOpener(b"x" * 262145),
+    )
+    result = client.propose(base, scenes, approve_local_model_call=True)
+    assert result.status == "local-model-reply-oversized"
+
+
+def test_untrusted_source_script_never_executed_or_printed_by_model_client():
+    scenes, base, draft = draft_for_slot()
+    different = list(scenes)
+    different[0] = replace(
+        different[0], english_text="$([System.IO.File]::Delete('D:/secret'))"
+    )
+    client, opener = fake_client(json.dumps(draft))
+    with pytest.raises(EditorialShotPlanError, match="stale-source-scenes"):
+        client.propose(base, different, approve_local_model_call=True)
+    assert opener.calls == []
+
+
+def test_cli_offline_default_and_explicit_output_does_not_write(tmp_path, capsys):
+    out = tmp_path / "planned.json"
+    assert main(["--slot", "2", "--output-json", str(out)]) == 0
+    text = capsys.readouterr().out
+    assert "BFS04A1_STATUS: local-model-approval-required" in text
+    assert "BFS04A1_MODEL_CALL_ATTEMPTS: 0" in text
+    assert "BFS04A1_CLOUD_UPLOADS: 0" in text
+    assert not out.exists()
+
+
+def test_cli_validated_proposal_written_only_to_explicit_new_json_file(
+    tmp_path, capsys, monkeypatch
+):
+    scenes, base, draft = draft_for_slot()
+    model_result = parse_local_editorial_reply(json.dumps(draft), base, scenes)
+    class FakePlanner:
+        def __init__(self, config): self.config = config
+        def propose(self, base, scenes, *, approve_local_model_call=False):
+            assert approve_local_model_call is True
+            return LocalEditorialOutcome(
+                "local-shot-plan-proposed-human-review", model_result,
+                calls_attempted=1, confirmed_http_requests="unknown",
+            )
+    monkeypatch.setattr(
+        "bin_finder.search.editorial_local_smoke.OllamaLocalEditorialPlanner",
+        FakePlanner,
+    )
+    target = tmp_path / "my_shots.json"
+    args = ["--slot", "2", "--approve-local-model-call",
+            "--output-json", str(target)]
+    assert main(args) == 0
+    first = capsys.readouterr().out
+    assert target.exists()
+    content = json.loads(target.read_text("utf-8"))
+    assert content["status"] == "proposal-only-unverified"
+    assert content["shots"][0]["rights_status"] == "pending"
+    assert "BFS04A1_JSON_WRITTEN: True" in first
+    assert str(tmp_path) not in first
+    # No silent overwriting: the new-file requirement is checked
+    # BEFORE model invocation.
+    assert main(args) == 2
+    err = capsys.readouterr().out
+    assert "BFS04A1_MODEL_CALL_ATTEMPTS: 0" in err
+    assert "BFS04A1_STATUS: invalid-local-output-target" in err
+
+
+def test_cli_broken_or_remote_output_target_blocks_inference(tmp_path, capsys):
+    assert main(["--approve-local-model-call",
+                 "--output-json", "https://host.invalid/output.json"]) == 2
+    o = capsys.readouterr().out
+    assert "BFS04A1_MODEL_CALL_ATTEMPTS: 0" in o
+    assert "BFS04A1_JSON_WRITTEN: True" not in o
