@@ -142,7 +142,7 @@ def test_model_suggestion_does_not_mutate_input():
     (lambda p: p["shots"][2].update(
         must_not_show=["snow-covered Alps", "unlabeled reenactment"]),
      "contradictory-shot-constraints"),
-    (lambda p: p["shots"].pop(3), "uncovered-visual-slot")
+    (lambda p: p["shots"].pop(5), "uncovered-visual-slot")
 ])
 def test_malformed_or_untrusted_shot_proposals_fail_closed(mutate, reason):
     scenes, base, proposal = inputs()
