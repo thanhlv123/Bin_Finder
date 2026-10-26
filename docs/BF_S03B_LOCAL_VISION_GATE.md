@@ -59,3 +59,18 @@ First validate the gate only with offline pytest (on a fresh `--basetemp` direct
 - `tests/test_bf_s03b_local_vision_bridge.py` is fully offline and injects fake local responses to cover second approval, mapping of scene to slot visual cues, timing, missing/invalid response, conflict, non-loopback URL rejection, no path/exception leaks, and F021 sampler/model config compatibility. Windows CI runs against the entire existing suite.
 
 **Operational restriction:** No CLI with automatic user media discovery or unapproved local file sampling has been added. A *later* explicit single-clip manual trial will require the user to choose a specific local video path under a restricted root and separately authorize Ollama inference. Neither the copied F021 implementation nor tests here demonstrate that the real footage shows the desired action, time or place. BF-S03B Phase 1 is implementation + offline compatibility tests, not yet local real-media/VLM acceptance.
+
+
+## Single local MP4 end-to-end pilot: explicit two opt-ins (Phase 1B)
+
+`src/bin_finder/search/slot_local_vision_smoke.py` is a **manual one-clip research harness** using the fixed *fishing boats entering a coastal harbor at dawn* VisualSlot. It tests **plumbing**, not whether the user's video was discovered from Pexels/Pixabay. The local candidate identity is `local:manual-single` — do not equate it with a provider's video ID or the previous BF-S03A ranked candidate pool.
+
+- Zero arguments prints no-media status; no reads, provider calls, downloads or Ollama requests.
+- A file path alone does not enable filesystem validation or inference.
+- `--approve-local-inspection` enables read-only gate validation. The optional `--approve-local-inference` is **separate and requires the first flag**, validated Ollama loopback, and an already existing clip under the allowed media directory.
+- `--start` and `--end` select a **positive finite** segment no longer than 120 seconds; the actual test command should derive length from local ffprobe and choose a safe subrange (e.g. up to 5 sec). At most one local clip, three frames, one F021 verify request. The verifier's timeout bounds execution; failures preserve no-evidence status.
+- CLI does not print arbitrary paths, source IDs, URL tokens, API keys, frame bytes or raw model free-text. It reports only fixed scenario/status codes, bounded float dimensions, unknowns, human-review flags. The model returns a *provisional* observation only.
+- `BFS03B_VERIFICATION_ATTEMPTS` counts attempted adapter calls, **not confirmed Ollama HTTP requests** (frame sampling can fail first). Accordingly `BFS03B_MODEL_REQUESTS_CONFIRMED: unknown` is shown once inference is approved and attempted; explicit no-call paths show zero.
+- Use the model `qwen3-vl:4b-instruct` as default (also allow `qwen3-vl:4b`), with 8192 context/4096 predicted token budget, loopback address only. Report unknown for missing subject/action/time VLM dimensions; three stills cannot verify direction, destination, camera movement or historical truth without playback.
+- `tests/test_bf_s03b_local_vision_smoke.py` uses **fake model responses only**, covers dual permission, no auto file selection, existing local input, remote URL rejection, missing files, safe reported numbers and no user path output. CI never submits video frames to Ollama.
+- The 42 user-local videos are not accessible to this GitHub runner. The human must select one of the installed MP4 files; the harness does **not** auto-choose a private video, download any new candidate, modify user files, or transfer footage to GitHub.
