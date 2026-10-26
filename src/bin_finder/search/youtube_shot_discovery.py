@@ -8,15 +8,70 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import re
-from typing import Protocol
 
 from bin_finder.models import CandidateRecord
+from bin_finder.providers.base import ProviderError
 from bin_finder.providers.base import SearchRequest
 from bin_finder.providers.youtube import YouTubeProvider
-from bin_finder.search.editorial_shot_plan import EditorialShot, EditorialShotPlan
+from bin_finder.search.editorial_shot_plan import EditorialShot
 
 _ID = re.compile(r"[A-Za-z0-9_-]{11}\Z")
 _MAX_CALLS = 3
+_YT_ERROR_RE = re.compile(
+    r"^YouTube/(search|details): HTTP ([45][0-9]{2}); reason=([A-Za-z_]+)$"
+)
+_YT_REASON_LABELS = {
+    "accessNotConfigured": "api-not-enabled",
+    "keyInvalid": "invalid-api-key",
+    "keyExpired": "expired-api-key",
+    "quotaExceeded": "quota-exceeded",
+    "dailyLimitExceeded": "daily-quota-exceeded",
+    "dailyLimitExceededUnreg": "daily-quota-exceeded",
+    "rateLimitExceeded": "rate-limited",
+    "userRateLimitExceeded": "rate-limited",
+    "forbidden": "forbidden",
+    "invalidSearchFilter": "invalid-search-filter",
+    "invalidFilters": "invalid-filters",
+    "invalidQuery": "invalid-query",
+    "API_KEY_SERVICE_BLOCKED": "api-key-service-blocked",
+    "API_KEY_INVALID": "invalid-api-key",
+    "PERMISSION_DENIED": "permission-denied",
+    "RESOURCE_EXHAUSTED": "resource-exhausted",
+    "unclassified": "unclassified",
+}
+
+
+def _safe_youtube_error_code(exc: Exception) -> str:
+    if isinstance(exc, ProviderError):
+        value = str(exc)
+        match = _YT_ERROR_RE.fullmatch(value)
+        if match:
+            stage, status, reason = match.groups()
+            return (
+                f"{stage}-http-{status}-"
+                + _YT_REASON_LABELS.get(reason, "unclassified")
+            )
+        # Generic HTTP error from a legacy/mock HTTP client.
+        old = re.fullmatch(r"YouTube: HTTP ([45][0-9]{2})", value)
+        if old:
+            return "http-" + old.group(1)
+        for stage in ("search", "details"):
+            prefix = "YouTube/" + stage + ": "
+            if value.startswith(prefix):
+                msg = value[len(prefix):]
+                codes = {
+                    "không thể kết nối mạng": "network-unreachable",
+                    "hết thời gian chờ": "timeout",
+                    "network failure": "network-failure",
+                    "phản hồi JSON không hợp lệ": "invalid-json",
+                    "phản hồi không hợp lệ": "invalid-response",
+                    "response too large": "response-too-large",
+                }
+                return stage + "-" + codes.get(msg, "provider-error")
+    # Never expose raw request URLs, API keys or arbitrary provider messages.
+    return "provider-error"
+
+
 _ALLOWED = frozenset({"authentic_person", "authentic_event", "location_context",
                      "illustrative_stock", "symbolic"})
 
@@ -50,6 +105,7 @@ class YouTubeShotSearchResult:
     hits: tuple[YouTubeReferenceHit, ...]
     search_attempts: int
     api_http_requests_confirmed: str = "unknown"
+    error_codes: tuple[str, ...] = ()
     audiovisual_downloads: int = 0
     user_clips_created: int = 0
 
@@ -124,11 +180,11 @@ def discover_youtube_for_shot(
             shot.shot_id, "youtube-api-key-not-configured", (), 0, "0"
         )
 
-    from bin_finder.providers.base import ProviderError
     seen: set[str] = set()
     hits: list[YouTubeReferenceHit] = []
     attempts = 0
     search_error = False
+    error_codes: list[str] = []
     for query in shot.search_queries[:max_queries]:
         if len(hits) >= max_results:
             break
@@ -140,8 +196,9 @@ def discover_youtube_for_shot(
                 safe_search=True, creative_commons_only=creative_commons_filter,
                 min_height=0,
             ))
-        except (ProviderError, OSError, ValueError, TypeError):
+        except (ProviderError, OSError, ValueError, TypeError) as exc:
             search_error = True
+            error_codes.append(_safe_youtube_error_code(exc))
             continue
         for item in response.candidates:
             ref = _to_reference(shot.shot_id, item)
@@ -158,4 +215,5 @@ def discover_youtube_for_shot(
                 else "no-youtube-references"),
         hits=tuple(hits),
         search_attempts=attempts,
+        error_codes=tuple(error_codes),
     )
