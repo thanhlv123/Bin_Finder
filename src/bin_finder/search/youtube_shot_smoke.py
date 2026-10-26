@@ -71,6 +71,7 @@ def main(argv=None) -> int:
     print("BFS06_STATUS:", result.status)
     print("BFS06_SEARCH_ATTEMPTS:", result.search_attempts)
     print("BFS06_RESULTS:", len(result.hits))
+    print("BFS06_ERROR_CODES:", ",".join(result.error_codes) or "none")
     for item in result.hits:
         print("BFS06_REFERENCE_ID:", item.video_id)
         print("BFS06_WATCH_URL:", item.watch_url)
