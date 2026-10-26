@@ -85,3 +85,24 @@ Images: specify `--mode still` and `--output-path shot_001.jpg`. The `--duration
 `tests/test_bf_s06_youtube_shot_sourcing.py` — no API calls without opt-in, two-API-metadata-requests per `YouTubeProvider.search` action, candidate dedup, CC vs standard metadata, no AV acquisition, bounded query budgets, disallowed graphic shots, local cut permission/time/file-system constraints, no source path escaping and disabled overwrite.
 
 CI: isolated `bf-s06-research-windows.yml`, full Windows project tests with real FFmpeg export and GUI regression tests. No real YouTube API calls in CI; metadata is mocked.
+
+
+## BF-S06R — user-local live YouTube search error diagnostics
+
+**Grounded user Windows result:** BF-S06 at commit \`49f2ba74bf2c1eefc7e6464507c071f2276cc858\`: 33 local tests passed and one symlink test skipped; dry run had 0 calls; API key entered privately in a PowerShell environment variable; explicit RUN -> one high-level query attempt, zero returned references, \`BFS06_STATUS: provider-error-no-references\`; API key removed from shell environment after the trial. The earlier implementation swallowed all API errors into the generic status and did not provide HTTP code or error reason, so **we do not know whether the key was invalid, API access disabled, quota exceeded, network connectivity, or a YouTube filter problem**. Never assert a particular cause without fresh evidence.
+
+**Research-only targeted diagnostic update:**
+- Existing YouTube Data API provider now attaches fixed phase labels \`YouTube/search\` vs \`YouTube/details\` to existing HTTP metadata requests.
+- The shared HTTP client handles YouTube errors only: reads a maximum 16 KiB of HTTP error response, parses JSON and extracts **only an explicit whitelist of known Google error reason codes**, never raw error \`message\`, key, request URL, JSON body or exception. Other providers are unchanged.
+- \`search/youtube_shot_discovery.py\` maps those whitelisted codes into fixed, safe labels, e.g. \`search-http-403-api-not-enabled\`, \`search-http-403-quota-exceeded\`, \`search-http-403-api-key-service-blocked\`, \`search-http-400-invalid-search-filter\`, \`search-network-unreachable\`, \`details-http-403-permission-denied\`. Unrecognized error content becomes \`unclassified\` / \`provider-error\`; no uncontrolled exception text enters reports.
+- The existing BF-S06 CLI prints \`BFS06_ERROR_CODES: ...\` on actual opted-in search. The distinction \`BFS06_SEARCH_ATTEMPTS=1\` is a high-level search attempt and **does not verify HTTP request count**. Still 0 footage downloads, frame uploads, video imports, extracts, or rights clearance.
+- Diagnostic tests \`tests/test_bf_s06_youtube_diagnostics.py\` simulate Google JSON error bodies, check no key leaks, status/phase mapping, wrong/out-of-whitelist reason refusals, and zero-HTTP default. No Google API key is committed to repository or CI.
+
+**Once you have the actual code:**
+- \`search-http-403-api-not-enabled\`: check project in Google Cloud, YouTube Data API v3 enabled on **the same project used to generate the key**, and key API restriction.
+- \`search-http-403-quota-exceeded\` or \`search-http-403-daily-quota-exceeded\`: check that project's quotas and usage, do not spam repeated test searches.
+- \`search-http-403-api-key-service-blocked\` / \`search-http-400-invalid-api-key\`: check application/API key restrictions and API key validity; never paste key into issues, screenshots or chat.
+- \`search-http-400-invalid-search-filter\`: review CC search filter, use standard-license *references-only* trial after explicit approval; standard license does not authorize copying.
+- \`search-network-unreachable\`, \`search-timeout\`: verify host network, proxy and firewall; never disable security tools to force API access.
+
+**Follow-up command** is the existing BF-S06 search CLI on a clean worktree updated to this head. Use a new Desktop report filename \`BFS06R_YouTube_Diagnostics.txt\`; one human-authorized \`--max-queries 1 --max-results 5\` request. Secret input is ephemeral in process environment and removed even on failure. The diagnostic never uploads local video or frames.
