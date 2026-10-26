@@ -37,6 +37,19 @@ _MOTION = frozenset({
 _STILL = frozenset({
     "dock", "moor", "anchor", "park", "stationary", "idle",
 })
+# BF-S03A.1: tiny, explicit action vocabulary for evidence *caution*.
+# These are not AI semantics. Related movement does not prove "entering".
+_ACTION_PREDICATES = frozenset({
+    "enter", "arrive", "approach", "sail", "move", "leave", "depart",
+    "drive", "walk", "run", "travel", "head", "search", "repair",
+    "unload", "load", "build", "sell", "buy", "deliver", "cross",
+    "march", "protest", "open", "close", "wait", "work", "cook",
+})
+_ARRIVAL_PREDICATES = frozenset({"enter", "arrive", "approach"})
+_RELATED_MOVEMENT = frozenset({
+    "sail", "move", "head", "travel", "approach", "arrive", "enter",
+    "drive",
+})
 
 
 def _lemma(word: str) -> str:
@@ -112,6 +125,7 @@ class MetadataEvidence:
     quality_points: int
     motion_conflict: bool
     excluded_phrase: bool
+    action_signal: str = "not-applicable"
 
 
 @dataclass(frozen=True)
@@ -183,6 +197,18 @@ def _rank_one(
     motion_indicated = bool(wordset & _MOTION)
     stationary_indicated = bool(wordset & _STILL)
     motion_conflict = motion_required and stationary_indicated and not motion_indicated
+    # Query nouns appearing in provider tags do NOT establish that an
+    # observable action occurs. Determine action-predicate evidence separately.
+    action_predicates = set(_tokens(q["action"])) & _ACTION_PREDICATES
+    if not action_predicates:
+        action_signal = "not-applicable"
+    elif action_predicates & wordset:
+        action_signal = "direct-word"
+    elif (action_predicates & _ARRIVAL_PREDICATES
+          and wordset & _RELATED_MOVEMENT):
+        action_signal = "related-motion-only"
+    else:
+        action_signal = "not-described"
     quality, quality_reason = _quality_points(candidate, settings)
 
     # Max: 38 + 12 + 20 + 20 + 10 = 100. Required-entity uncertainty
@@ -196,6 +222,12 @@ def _rank_one(
         score -= 32
     if motion_conflict:
         score -= 24
+    # When an action predicate is identifiable, generic search-hit nouns
+    # (e.g. "fishing vessel harbor") must not create confident action scores.
+    if action_signal == "not-described":
+        score -= 32
+    elif action_signal == "related-motion-only":
+        score += 12
     score = max(0, min(100, score))
 
     reasons: list[str] = [quality_reason, "unverified-provider-metadata"]
@@ -213,11 +245,17 @@ def _rank_one(
         reasons.append("must-not-show-phrase-in-metadata")
     if motion_conflict:
         reasons.append("motion-vs-stationary-metadata-conflict")
+    if action_signal == "not-described":
+        reasons.append("action-predicate-not-described")
+    elif action_signal == "related-motion-only":
+        reasons.append("related-motion-does-not-prove-target-action")
 
     # "promising" is always a metadata review priority, never visual
     # verification, licensing clearance, or automatic candidate approval.
     if excluded or motion_conflict:
         priority = "metadata-caution"
+    elif action_signal == "not-described":
+        priority = "metadata-action-unconfirmed"
     elif subject >= 0.5 and (action >= 0.5 or moment >= 0.5):
         priority = "metadata-promising-for-review"
     else:
@@ -230,6 +268,7 @@ def _rank_one(
             action=round(action, 4), must_show=round(must_show, 4),
             required_entities=round(required, 4), quality_points=quality,
             motion_conflict=motion_conflict, excluded_phrase=excluded,
+            action_signal=action_signal,
         ),
         reasons=tuple(reasons), priority=priority,
     )
