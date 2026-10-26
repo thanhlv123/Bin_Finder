@@ -108,6 +108,7 @@ def main(argv: list[str] | None = None) -> int:
             "subject=" + str(d.subject),
             "moment=" + str(d.moment),
             "action=" + str(d.action),
+            "action_signal=" + d.action_signal,
             "quality=" + str(d.quality_points),
             "reasons=" + ",".join(item.reasons),
         )
