@@ -21,7 +21,7 @@ def test_offline_default_zero_calls_and_no_paths(capsys):
     assert main([]) == 0
     out = capsys.readouterr().out
     assert "BFS03B_STATUS: no-manual-media-selected" in out
-    assert "BFS03B_MODEL_CALLS: 0" in out
+    assert "BFS03B_VERIFICATION_ATTEMPTS: 0" in out
     assert "BFS03B_PROVIDER_CALLS: 0" in out
     assert "BFS03B_CLOUD_IMAGE_UPLOADS: 0" in out
 
@@ -33,7 +33,7 @@ def test_nominated_file_without_any_opt_in_never_inspects(tmp_path, capsys):
     ]) == 0
     output = capsys.readouterr().out
     assert "BFS03B_LOCAL_GATE: manual-opt-in-required" in output
-    assert "BFS03B_MODEL_CALLS: 0" in output
+    assert "BFS03B_VERIFICATION_ATTEMPTS: 0" in output
     assert str(missing) not in output
 
 
@@ -49,7 +49,7 @@ def test_local_inspection_does_not_imply_ollama_permission(tmp_path, capsys, mon
     output = capsys.readouterr().out
     assert "BFS03B_LOCAL_GATE: local-ready-for-inference-approval" in output
     assert "BFS03B_STATUS: local-inference-approval-required" in output
-    assert "BFS03B_MODEL_CALLS: 0" in output
+    assert "BFS03B_VERIFICATION_ATTEMPTS: 0" in output
 
 
 def test_second_flag_cannot_bypass_first(capsys):
@@ -91,7 +91,8 @@ def test_one_local_clip_fake_vision_result_is_unverified(tmp_path, capsys, monke
     assert len(calls) == 1 and calls[0][2] is True
     assert calls[0][3].url == "http://127.0.0.1:11434"
     assert calls[0][3].frames == 3
-    assert "BFS03B_MODEL_CALLS: 1" in out
+    assert "BFS03B_VERIFICATION_ATTEMPTS: 1" in out
+    assert "BFS03B_MODEL_REQUESTS_CONFIRMED: unknown" in out
     assert "BFS03B_SUBJECT: 0.8000" in out
     assert "BFS03B_ACTION: unknown" in out
     assert "BFS03B_TIME: unknown" in out
