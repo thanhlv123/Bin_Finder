@@ -253,11 +253,13 @@ class SlotMetadataRanker:
         if len(matches) != 1 or matches[0].action != "search":
             raise MetadataRankingError("invalid-search-slot")
         slot = matches[0]
-        if (len({hit.key for hit in slot_result.hits}) != len(slot_result.hits)
-                or len(slot_result.hits) > 60):
+        if (len(slot_result.hits) > 60
+                or any(not isinstance(hit, CandidateHit) for hit in slot_result.hits)):
+            raise MetadataRankingError("invalid-candidate-set")
+        if len({hit.key for hit in slot_result.hits}) != len(slot_result.hits):
             raise MetadataRankingError("invalid-candidate-set")
         for hit in slot_result.hits:
-            if (not isinstance(hit, CandidateHit)
+            if (hit.candidate is None
                     or hit.slot_id != slot.slot_id
                     or hit.beat_id != slot.beat_id
                     or hit.scene_ids != slot.scene_ids
