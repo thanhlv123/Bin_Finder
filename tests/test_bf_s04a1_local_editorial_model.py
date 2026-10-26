@@ -319,3 +319,104 @@ def test_shots_only_rejects_model_attempt_at_license_or_fact_verification():
     rows[0]["rights_status"] = "approved"
     with pytest.raises(EditorialShotPlanError, match="^forged-rights-approval$"):
         parse_local_editorial_reply(json.dumps({"shots": rows}), base, scenes)
+
+
+
+@pytest.mark.parametrize("language,code", [
+    ("English", "en"),
+    ("ENGLISH", "en"),
+    (" en ", "en"),
+    ("EN", "en"),
+    ("French", "fr"),
+    ("français", "fr"),
+    ("francais", "fr"),
+    ("German", "de"),
+    ("Deutsch", "de"),
+    ("Spanish", "es"),
+    ("español", "es"),
+    ("Vietnamese", "vi"),
+    ("tiếng việt", "vi"),
+])
+def test_known_model_language_aliases_are_canonicalized_but_not_guessed(language, code):
+    scenes, base, draft = draft_for_slot(2)
+    proposed = {"shots": [dict(draft["shots"][0])]}
+    proposed["shots"][0]["search_queries"] = [{"language": language, "text": "ski slope"}]
+    original = json.dumps(proposed, ensure_ascii=False)
+    plan = parse_local_editorial_reply(original, base, scenes)
+    assert plan.shots[0].search_queries[0].language == code
+    assert json.dumps(proposed, ensure_ascii=False) == original
+
+
+@pytest.mark.parametrize("language", [
+    "en-US", "fr-FR", "Russian", "zh", "unknown", "", 5, None, ["en"],
+])
+def test_unsupported_or_ambiguous_language_is_still_rejected(language):
+    scenes, base, draft = draft_for_slot(2)
+    proposed = {"shots": [dict(draft["shots"][0])]}
+    proposed["shots"][0]["search_queries"] = [{"language": language, "text": "ski slope"}]
+    with pytest.raises(EditorialShotPlanError, match="^invalid-shot-language$"):
+        parse_local_editorial_reply(json.dumps(proposed), base, scenes)
+
+
+def test_normalized_count_is_auditable_after_one_fake_ollama_request():
+    scenes, base, draft = draft_for_slot(2)
+    proposed = {"shots": [dict(draft["shots"][0])]}
+    proposed["shots"][0]["search_queries"] = [
+        {"language": "English", "text": "gentle blue piste"},
+        {"language": "French", "text": "piste bleue douce"},
+    ]
+    client, opener = fake_client(json.dumps(proposed, ensure_ascii=False))
+    outcome = client.propose(base, scenes, approve_local_model_call=True)
+    assert outcome.status == "local-shot-plan-proposed-human-review"
+    assert len(opener.calls) == 1
+    assert outcome.normalized_language_labels == 2
+    assert outcome.plan is not None
+    assert [q.language for q in outcome.plan.shots[0].search_queries] == ["en", "fr"]
+    assert outcome.plan.shots[0].timeline_approved is False
+    assert outcome.plan.shots[0].rights_status == "pending"
+
+
+def test_unknown_language_does_not_autotranslate_or_second_request():
+    scenes, base, draft = draft_for_slot(2)
+    proposed = {"shots": [dict(draft["shots"][0])]}
+    proposed["shots"][0]["search_queries"] = [
+        {"language": "Klingon", "text": "alpine ski slope"}
+    ]
+    client, opener = fake_client(json.dumps(proposed, ensure_ascii=False))
+    outcome = client.propose(base, scenes, approve_local_model_call=True)
+    assert outcome.status == "local-model-shot-plan-rejected"
+    assert outcome.reject_reason == "invalid-shot-language"
+    assert outcome.plan is None
+    assert outcome.normalized_language_labels == 0
+    assert len(opener.calls) == 1
+
+
+def test_normalization_never_rewrites_factual_claims_or_forged_license():
+    scenes, base, draft = draft_for_slot(2)
+    proposed = {"shots": [dict(draft["shots"][0])]}
+    proposed["shots"][0]["search_queries"] = [
+        {"language": "English", "text": "ski resort"}
+    ]
+    proposed["shots"][0]["rights_status"] = "approved"
+    with pytest.raises(EditorialShotPlanError, match="^forged-rights-approval$"):
+        parse_local_editorial_reply(json.dumps(proposed), base, scenes)
+
+
+def test_normalization_never_fills_missing_source_anchor():
+    scenes, base, draft = draft_for_slot(2)
+    proposed = {"shots": [dict(draft["shots"][0])]}
+    proposed["shots"][0]["search_queries"] = [
+        {"language": "English", "text": "ski resort"}
+    ]
+    proposed["shots"][0].pop("source_anchor")
+    with pytest.raises(EditorialShotPlanError, match="^invalid-shot-anchor$"):
+        parse_local_editorial_reply(json.dumps(proposed), base, scenes)
+
+
+def test_prompt_explicitly_requires_iso_codes_and_not_full_names():
+    from bin_finder.search.editorial_shot_prompt import make_editorial_shot_prompt
+    scenes, base, draft = draft_for_slot(2)
+    prompt = make_editorial_shot_prompt(base, scenes, shots_only=True)
+    assert "language value MUST be one exact lowercase code" in prompt
+    assert "NEVER use language names English, French" in prompt
+    assert "en/fr/vi/es/de" in prompt
