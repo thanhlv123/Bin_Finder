@@ -254,9 +254,11 @@ def _rank_one(
     # verification, licensing clearance, or automatic candidate approval.
     if excluded or motion_conflict:
         priority = "metadata-caution"
+    elif subject < 0.5:
+        priority = "metadata-limited-evidence"
     elif action_signal == "not-described":
         priority = "metadata-action-unconfirmed"
-    elif subject >= 0.5 and (action >= 0.5 or moment >= 0.5):
+    elif action >= 0.5 or moment >= 0.5:
         priority = "metadata-promising-for-review"
     else:
         priority = "metadata-limited-evidence"
