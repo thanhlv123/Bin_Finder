@@ -250,3 +250,72 @@ def test_cli_broken_or_remote_output_target_blocks_inference(tmp_path, capsys):
     o = capsys.readouterr().out
     assert "BFS04A1_MODEL_CALL_ATTEMPTS: 0" in o
     assert "BFS04A1_JSON_WRITTEN: True" not in o
+
+
+def test_shots_only_model_output_gets_trusted_envelope_and_stays_unverified():
+    scenes, base, draft = draft_for_slot(2)
+    shots_only = {"shots": draft["shots"]}
+    plan = parse_local_editorial_reply(
+        json.dumps(shots_only, ensure_ascii=False), base, scenes
+    )
+    assert plan.plan_id == "bf_s04a_model_proposal"
+    assert plan.base_plan_id == base.plan_id
+    assert plan.source_digest == base.source_digest
+    assert len(plan.shots) == 3
+    assert all(s.rights_status == "pending" for s in plan.shots)
+    assert all(s.factual_status == "unverified" for s in plan.shots)
+    assert all(s.timeline_approved is False for s in plan.shots)
+
+
+def test_shots_only_prompt_does_not_delegate_project_identity_to_model():
+    from bin_finder.search.editorial_shot_prompt import make_editorial_shot_prompt
+    scenes, base, _ = draft_for_slot(2)
+    prompt = make_editorial_shot_prompt(base, scenes, shots_only=True)
+    assert "ONLY the top-level key shots" in prompt
+    assert "those identity fields are owned by the application" in prompt
+    assert "ONE JSON object" in prompt
+    assert "Gaspard" not in prompt  # selected Ski-Savoie slot has no actor name
+    assert "en Savoie" in prompt
+
+
+def test_shots_only_client_one_mock_request_and_no_ai_fallback():
+    scenes, base, draft = draft_for_slot(2)
+    client, opener = fake_client(
+        json.dumps({"shots": draft["shots"]}, ensure_ascii=False)
+    )
+    result = client.propose(base, scenes, approve_local_model_call=True)
+    assert len(opener.calls) == 1
+    assert result.status == "local-shot-plan-proposed-human-review"
+    assert result.plan is not None
+    payload = json.loads(opener.calls[0][0].data)
+    assert "ONLY the top-level key shots" in payload["messages"][0]["content"]
+    assert "images" not in payload["messages"][0]
+
+
+@pytest.mark.parametrize("top,reason", [
+    ({"shots": []}, "invalid-shot-list"),
+    ({"shots": [], "format": "wrong"}, "invalid-shot-format"),
+    ({"shots": [], "base_plan_id": "forged"}, "invalid-shot-format"),
+    ({"shots": [], "source_digest": "0" * 64}, "invalid-shot-format"),
+    ({"shots": [], "rights_status": "approved"}, "invalid-shot-format"),
+])
+def test_partial_or_forged_wrappers_are_not_auto_repaired(top, reason):
+    scenes, base, _ = draft_for_slot(2)
+    with pytest.raises(EditorialShotPlanError, match="^" + reason + "$"):
+        parse_local_editorial_reply(json.dumps(top), base, scenes)
+
+
+def test_shots_only_does_not_fill_in_missing_shot_content():
+    scenes, base, draft = draft_for_slot(2)
+    rows = [dict(draft["shots"][0])]
+    del rows[0]["source_anchor"]
+    with pytest.raises(EditorialShotPlanError, match="^invalid-shot-anchor$"):
+        parse_local_editorial_reply(json.dumps({"shots": rows}), base, scenes)
+
+
+def test_shots_only_rejects_model_attempt_at_license_or_fact_verification():
+    scenes, base, draft = draft_for_slot(2)
+    rows = [dict(draft["shots"][0])]
+    rows[0]["rights_status"] = "approved"
+    with pytest.raises(EditorialShotPlanError, match="^forged-rights-approval$"):
+        parse_local_editorial_reply(json.dumps({"shots": rows}), base, scenes)
