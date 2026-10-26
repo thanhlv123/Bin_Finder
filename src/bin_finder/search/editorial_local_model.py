@@ -7,6 +7,7 @@ One model request maximum per explicit approval; no hidden retries/fallbacks.
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 import math
 import urllib.error
 import urllib.request
@@ -62,6 +63,7 @@ class LocalEditorialOutcome:
     calls_attempted: int = 0
     confirmed_http_requests: str = "0"
     reject_reason: str = ""
+    normalized_language_labels: int = 0
     provider_calls: int = 0
     cloud_uploads: int = 0
     media_downloads: int = 0
@@ -77,10 +79,27 @@ def _duplicate_guard(pairs):
     return obj
 
 
-def parse_local_editorial_reply(
+# Only exact language labels/supported case variants are recovered here.
+# The canonical BF-S04A shot-plan contract STILL accepts only en/fr/vi/es/de.
+# This narrow model-facing adapter does not infer languages from query text.
+_LANGUAGE_ALIASES = {
+    "english": "en", "french": "fr", "français": "fr", "francais": "fr",
+    "vietnamese": "vi", "tiếng việt": "vi", "tieng viet": "vi",
+    "spanish": "es", "español": "es", "espanol": "es",
+    "german": "de", "deutsch": "de",
+}
+_LANGUAGE_CODES = frozenset({"en", "fr", "vi", "es", "de"})
+
+
+def _parse_reply_and_diagnostics(
     reply: str, base: SemanticSearchPlan, scenes: Sequence[SceneRecord],
-) -> EditorialShotPlan:
-    """One strictly bounded JSON object, then canonical editorial validator."""
+) -> tuple[EditorialShotPlan, int]:
+    """Strict JSON + bounded known-label normalization, then canonical gate.
+
+    Unknown/missing/ambiguous languages are NOT guessed or repaired. All shot
+    claims, source anchors, exclusions, media categories and rights remain
+    untouched and subject to the original strict validator.
+    """
     if not isinstance(reply, str) or not reply.strip():
         raise EditorialShotPlanError("empty-local-model-reply")
     if len(reply.encode("utf-8")) > MAX_RESPONSE_BYTES:
@@ -94,9 +113,7 @@ def parse_local_editorial_reply(
         raise EditorialShotPlanError("invalid-local-model-json") from None
     if not isinstance(candidate, dict):
         raise EditorialShotPlanError("invalid-local-model-object")
-    # The model may emit ONLY editorial shot rows. The trusted application
-    # supplies immutable version/plan IDs/digest; it does not invent, correct
-    # or authorize the model-generated visual choices or license claims.
+    # App generates unforgeable technical envelope ONLY for shot-only replies.
     if set(candidate) == {"shots"}:
         candidate = {
             "format": EDITORIAL_PLAN_FORMAT,
@@ -105,10 +122,43 @@ def parse_local_editorial_reply(
             "source_digest": base.source_digest,
             "shots": candidate["shots"],
         }
-    # A legacy full wrapper remains fully validated; partial/forged wrappers
-    # never get fixed up or silently blessed as authoritative.
-    return parse_editorial_shot_plan(candidate, base, scenes)
+    # Never normalize anything until wrapper validity and per-shot data
+    # structure have been checked in the canonical parser. But model language
+    # labels are normalized into exact codes in a deep copy before that call.
+    rows = candidate.get("shots")
+    normalized = 0
+    if isinstance(rows, list) and len(rows) <= 1000:
+        candidate = deepcopy(candidate)
+        rows = candidate["shots"]
+        for row in rows:
+            if not isinstance(row, dict):
+                continue
+            queries = row.get("search_queries")
+            if not isinstance(queries, list) or len(queries) > 6:
+                continue
+            for query in queries:
+                if not isinstance(query, dict) or not isinstance(
+                    query.get("language"), str
+                ):
+                    continue
+                raw = query["language"]
+                cleaned = " ".join(raw.strip().casefold().split())
+                code = cleaned if cleaned in _LANGUAGE_CODES else _LANGUAGE_ALIASES.get(cleaned)
+                if code is not None and raw != code:
+                    # Mutate COPY only. Unknown entries are rejected by the
+                    # existing BF-S04A parser with invalid-shot-language.
+                    query["language"] = code
+                    normalized += 1
+    plan = parse_editorial_shot_plan(candidate, base, scenes)
+    return plan, normalized
 
+
+def parse_local_editorial_reply(
+    reply: str, base: SemanticSearchPlan, scenes: Sequence[SceneRecord],
+) -> EditorialShotPlan:
+    """Validate optional known text-model language spellings; fail closed."""
+    plan, _ = _parse_reply_and_diagnostics(reply, base, scenes)
+    return plan
 
 class OllamaLocalEditorialPlanner:
     def __init__(self, config: LocalEditorialConfig | None = None, *, opener=None):
@@ -174,7 +224,7 @@ class OllamaLocalEditorialPlanner:
                 confirmed_http_requests="unknown",
             )
         try:
-            result = parse_local_editorial_reply(reply, base, scenes)
+            result, normalized_count = _parse_reply_and_diagnostics(reply, base, scenes)
         except EditorialShotPlanError as exc:
             # Fixed error codes from the structural validator; raw model output
             # is never copied into report or app logs.
@@ -185,4 +235,5 @@ class OllamaLocalEditorialPlanner:
         return LocalEditorialOutcome(
             "local-shot-plan-proposed-human-review", plan=result,
             calls_attempted=1, confirmed_http_requests="unknown",
+            normalized_language_labels=normalized_count,
         )
