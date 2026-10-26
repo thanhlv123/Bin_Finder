@@ -150,8 +150,9 @@ def verify_local_vision(
             notes.append("time-of-day-not-assessed")
         if slot.required_entities:
             notes.append("required-entities-need-external-evidence")
-        if slot.evidence_type == "direct":
-            notes.append("temporal-action-requires-human-playback")
+        # Even a contextual VisualSlot may request a temporal action.
+        # Three still frames alone cannot establish its direction/order.
+        notes.append("temporal-action-requires-human-playback")
         if dims.context_conflict is not None and dims.context_conflict >= .7:
             notes.append("possible-must-not-show-conflict")
         status = (
