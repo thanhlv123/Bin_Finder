@@ -101,6 +101,7 @@ def main(argv=None) -> int:
     print("BFS04A1_MODEL_HTTP_REQUESTS_CONFIRMED:", result.confirmed_http_requests)
     print("BFS04A1_REJECT_REASON:", result.reject_reason or "none")
     print("BFS04A1_JSON_VALIDATED:", result.plan is not None)
+    print("BFS04A1_LANGUAGE_LABELS_NORMALIZED:", result.normalized_language_labels)
 
     if result.plan is None:
         print("BFS04A1_JSON_WRITTEN: False")
