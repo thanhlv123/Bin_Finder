@@ -15,7 +15,8 @@ from typing import Sequence
 
 from bin_finder.models import SceneRecord
 from bin_finder.search.editorial_shot_plan import (
-    EditorialShotPlan, EditorialShotPlanError, parse_editorial_shot_plan,
+    EditorialShotPlan, EditorialShotPlanError,
+    FORMAT as EDITORIAL_PLAN_FORMAT, parse_editorial_shot_plan,
 )
 from bin_finder.search.editorial_shot_prompt import make_editorial_shot_prompt
 from bin_finder.search.visual_search_contract import SemanticSearchPlan
@@ -93,6 +94,19 @@ def parse_local_editorial_reply(
         raise EditorialShotPlanError("invalid-local-model-json") from None
     if not isinstance(candidate, dict):
         raise EditorialShotPlanError("invalid-local-model-object")
+    # The model may emit ONLY editorial shot rows. The trusted application
+    # supplies immutable version/plan IDs/digest; it does not invent, correct
+    # or authorize the model-generated visual choices or license claims.
+    if set(candidate) == {"shots"}:
+        candidate = {
+            "format": EDITORIAL_PLAN_FORMAT,
+            "plan_id": "bf_s04a_model_proposal",
+            "base_plan_id": base.plan_id,
+            "source_digest": base.source_digest,
+            "shots": candidate["shots"],
+        }
+    # A legacy full wrapper remains fully validated; partial/forged wrappers
+    # never get fixed up or silently blessed as authoritative.
     return parse_editorial_shot_plan(candidate, base, scenes)
 
 
@@ -115,7 +129,7 @@ class OllamaLocalEditorialPlanner:
             raise LocalEditorialConfigError("invalid-local-model-approval")
         # Validate scene digest and bounded prompt even in dry-run mode, but
         # never initialize an outbound request without explicit approval.
-        prompt = make_editorial_shot_prompt(base, scenes)
+        prompt = make_editorial_shot_prompt(base, scenes, shots_only=True)
         if not approve_local_model_call:
             return LocalEditorialOutcome("local-model-approval-required")
 
