@@ -83,3 +83,21 @@ Set `PYTHONPATH` to this isolated research branch `src` before running; ensure t
 3. User manually authorizes **at most six** live Pexels/Pixabay metadata-only requests and sends redacted console summary.
 4. Compare metadata ranking of “docked” vs “sailing” footage and remove clearly wrong category from top candidates **without claiming frame verification**.
 5. BF-S03B will inspect locally accessible permitted video frames via Ollama loopback and allow abstention/manual review; it must **never silently select/download/approve** a candidate.
+
+
+## BF-S03A.1 — Action predicate evidence correction after live pilot
+
+**User-local live evidence:** 21/21 local tests passed; six provider requests succeeded; 26 unique candidates, 20 ranked after BF-S02.1's cap. The first metadata ranking placed `pixabay:1104` (generic fishing vessel/harbor nouns) at 87, `pixabay:35609` (harbor/village) at 82 and `pexels:10020348` (a boat explicitly *sailing at sea*) at only 47, position 10. An unrelated oil-refinery result `pixabay:330501` received 49 because its metadata shared general context words. These ranks were not evidence of visible entry into the harbor.
+
+**Failure mode:** the action-query coverage includes subject/location nouns (such as `fishing`, `vessel`, `harbor`) and overstates action evidence when the core predicate (`entering`) is absent. Provider tags describing motion can also be inadequate evidence of *destination*.
+
+**Correction (offline and research-only, not a trained model):**
+- Detect whether the **requested action query** contains a verb from a small explicit action vocabulary, e.g. `enter`, `drive`, `search`, `repair`.
+- Independently classify provider title/description predicate evidence as `direct-word` (+12 research points, exact root), `related-motion-only` (+8 research points for approaching/arriving/entering request when metadata describes nearby motion such as sailing), `not-described` (−40 research points), or `not-applicable` (no identifiable predicate; *no* invented action evidence).
+- Always report the new `action_signal` in the offline/live CLI. Fixed diagnostic reasons `action-predicate-not-described` and `related-motion-does-not-prove-target-action` make uncertainty visible. `metadata-action-unconfirmed` distinguishes a promising subject match whose action is not described; missing subject remains `metadata-limited-evidence`. Stationary/explicit banned-content conflict penalties remain.
+- A *related* motion label does **not** establish that a boat is entering the harbor. It prioritizes a possible video for manual review only; all records remain `metadata-only-unverified`.
+- Do not modify Pexels/Pixabay adapters, alter selection/locking, rank by provider brand, query axes or license flags, download video, or call Ollama.
+
+Added fake regression cases modeled on the local pilot, comparing motion-related sailing vs generic fishing-harbor keywords, direct entering vs related sailing, refinery lexical false positives, docked conflict, and irrelevant API scores. These tests cannot establish real visual accuracy.
+
+**Important:** This is an **exploratory heuristic correction to BF-S03A**. Its uncalibrated point values and limited English verb normalization must be reviewed using *human-labeled actual footage* before BF-S03B or GUI deployment. A high metadata score alone is never a verified match or license clearance.
