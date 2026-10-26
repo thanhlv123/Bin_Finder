@@ -70,7 +70,7 @@ class YouTubeProvider:
         search_payload = self.http.get_json(
             self.SEARCH_URL,
             params=params,
-            provider_name=self.display_name,
+            provider_name="YouTube/search",
         )
         ids: list[str] = []
         for item in search_payload.get("items") or []:
@@ -90,7 +90,7 @@ class YouTubeProvider:
                 "id": ",".join(ids),
                 "key": self.api_key,
             },
-            provider_name=self.display_name,
+            provider_name="YouTube/details",
         )
         candidates: list[CandidateRecord] = []
         for item in detail_payload.get("items") or []:

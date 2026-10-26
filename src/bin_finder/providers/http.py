@@ -10,6 +10,46 @@ from urllib.request import Request, urlopen
 from bin_finder.providers.base import ProviderError
 
 
+
+# Fixed known YouTube error reasons only. Never return Google's raw error
+# message, request URL, credentials or response body in a report.
+_YOUTUBE_REASON_CODES = frozenset({
+    "accessNotConfigured", "keyInvalid", "keyExpired", "quotaExceeded",
+    "dailyLimitExceeded", "dailyLimitExceededUnreg", "rateLimitExceeded",
+    "userRateLimitExceeded", "forbidden", "invalidSearchFilter",
+    "invalidFilters", "invalidQuery", "API_KEY_SERVICE_BLOCKED",
+    "API_KEY_INVALID", "PERMISSION_DENIED", "RESOURCE_EXHAUSTED",
+})
+
+
+def _safe_youtube_http_error_reason(exc: HTTPError) -> str:
+    try:
+        blob = exc.read(16384 + 1)
+        if len(blob) > 16384:
+            return "unclassified"
+        parsed = json.loads(blob.decode("utf-8"))
+        error = parsed.get("error")
+        if not isinstance(error, dict):
+            return "unclassified"
+        reasons = [
+            item.get("reason")
+            for item in error.get("errors", [])[:4]
+            if isinstance(item, dict)
+        ] if isinstance(error.get("errors"), list) else []
+        details = error.get("details")
+        if isinstance(details, list):
+            reasons.extend(
+                x.get("reason") for x in details[:4] if isinstance(x, dict)
+            )
+        reasons.append(error.get("status"))
+        for reason in reasons:
+            if isinstance(reason, str) and reason in _YOUTUBE_REASON_CODES:
+                return reason
+    except (ValueError, TypeError, UnicodeError, OSError, AttributeError):
+        pass
+    return "unclassified"
+
+
 class JsonHttpClient:
     """Small stdlib JSON client so F002 adds no runtime dependency."""
 
@@ -38,6 +78,13 @@ class JsonHttpClient:
         except UnicodeDecodeError:
             raise ProviderError(f"{provider_name}: invalid response encoding") from None
         except HTTPError as exc:
+            if provider_name in {"YouTube/search", "YouTube/details"}:
+                reason = _safe_youtube_http_error_reason(exc)
+                # ProviderError text is bounded and entirely from fixed known
+                # codes + integer HTTP status; never raw Google messages.
+                raise ProviderError(
+                    f"{provider_name}: HTTP {int(exc.code)}; reason={reason}"
+                ) from None
             raise ProviderError(f"{provider_name}: HTTP {exc.code}") from None
         except URLError:
             raise ProviderError(f"{provider_name}: không thể kết nối mạng") from None
