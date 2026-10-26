@@ -225,8 +225,10 @@ def _rank_one(
     # When an action predicate is identifiable, generic search-hit nouns
     # (e.g. "fishing vessel harbor") must not create confident action scores.
     if action_signal == "not-described":
-        score -= 32
+        score -= 40
     elif action_signal == "related-motion-only":
+        score += 8
+    elif action_signal == "direct-word":
         score += 12
     score = max(0, min(100, score))
 
