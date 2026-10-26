@@ -279,3 +279,76 @@ def test_still_window_must_be_one_to_seven_seconds(tmp_path):
     check_cut_request(r)
     with pytest.raises(AuthorizedLocalCutError):
         check_cut_request(replace(r, duration_seconds=8))
+
+
+def test_cut_cli_without_rights_approval_is_noop(tmp_path, capsys):
+    from bin_finder.search.authorized_local_cut_smoke import main as cut_main
+    r = request(tmp_path)
+    args = [
+        "--source-path", r.source_path,
+        "--source-root", r.source_root,
+        "--output-path", r.output_path,
+        "--output-root", r.output_root,
+        "--start", "2",
+        "--duration", "3",
+        "--mode", "clip",
+        "--provenance", "licensed_independent_master_copy",
+    ]
+    assert cut_main(args) == 0
+    out = capsys.readouterr().out
+    assert "BFS06_CUT_STATUS: cut-approval-required" in out
+    assert "BFS06_YOUTUBE_AUDIOVISUAL_DOWNLOADS: 0" in out
+    assert not Path(r.output_path).exists()
+
+
+def test_cut_cli_rejects_direct_youtube_urls_as_file_paths(tmp_path, capsys):
+    from bin_finder.search.authorized_local_cut_smoke import main as cut_main
+    r = request(tmp_path)
+    assert cut_main([
+        "--source-path", "https://www.youtube.com/watch?v=AbCdefG1234",
+        "--source-root", r.source_root,
+        "--output-path", r.output_path,
+        "--output-root", r.output_root,
+        "--start", "0", "--duration", "2", "--mode", "clip",
+        "--provenance", "licensed_independent_master_copy",
+        "--confirm-usage-rights", "--approve-local-cut",
+    ]) == 2
+    o = capsys.readouterr().out
+    assert "BFS06_CUT_STATUS: invalid-cut-request" in o
+    assert "youtube.com" not in o
+
+
+def test_real_ffmpeg_clip_and_still_local_only(tmp_path):
+    import shutil
+    import subprocess
+    from bin_finder.analysis.probe import FFprobeMediaProbe
+    if not shutil.which("ffmpeg") or not shutil.which("ffprobe"):
+        pytest.skip("FFmpeg unavailable outside Windows CI")
+    r = request(tmp_path, start=1.5, duration=2, mode="clip")
+    # Explicitly synthetic source created entirely locally, not YouTube footage.
+    generated = subprocess.run([
+        shutil.which("ffmpeg"), "-hide_banner", "-loglevel", "error",
+        "-nostdin", "-y", "-f", "lavfi", "-i",
+        "testsrc2=size=320x180:rate=10:duration=6",
+        "-pix_fmt", "yuv420p", "-c:v", "libx264", r.source_path,
+    ], capture_output=True, timeout=30, check=False)
+    assert generated.returncode == 0
+    clip = export_authorized_local_cut(
+        replace(r, provenance="user_owned_original_master",
+                confirm_usage_rights=True, approve_local_cut=True)
+    )
+    assert clip.output_written
+    video = FFprobeMediaProbe().probe(r.output_path)
+    assert video.width == 320 and video.height == 180
+    assert 1.5 <= video.duration <= 2.5
+
+    still = replace(r, mode="still", output_path=str(
+        Path(r.output_root) / "frame.jpg"))
+    outcome = export_authorized_local_cut(
+        replace(still, provenance="user_owned_original_master",
+                confirm_usage_rights=True, approve_local_cut=True)
+    )
+    assert outcome.output_written
+    frame = Path(still.output_path)
+    assert frame.read_bytes().startswith(b"\xff\xd8")
+    assert outcome.duration_seconds == 2
