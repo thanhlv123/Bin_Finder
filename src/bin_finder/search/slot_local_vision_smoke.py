@@ -86,7 +86,8 @@ def main(argv: list[str] | None = None) -> int:
 
     if not args.video:
         print("BFS03B_STATUS: no-manual-media-selected")
-        print("BFS03B_MODEL_CALLS: 0")
+        print("BFS03B_VERIFICATION_ATTEMPTS: 0")
+        print("BFS03B_MODEL_REQUESTS_CONFIRMED: 0")
         return 0
 
     _, plan = synthetic_example()
@@ -101,11 +102,13 @@ def main(argv: list[str] | None = None) -> int:
     )
     print("BFS03B_LOCAL_GATE:", gate.status)
     if not args.approve_local_inference:
-        print("BFS03B_MODEL_CALLS: 0")
+        print("BFS03B_VERIFICATION_ATTEMPTS: 0")
+        print("BFS03B_MODEL_REQUESTS_CONFIRMED: 0")
         print("BFS03B_STATUS: local-inference-approval-required")
         return 0
     if gate.status != "local-ready-for-inference-approval":
-        print("BFS03B_MODEL_CALLS: 0")
+        print("BFS03B_VERIFICATION_ATTEMPTS: 0")
+        print("BFS03B_MODEL_REQUESTS_CONFIRMED: 0")
         print("BFS03B_STATUS: no-safe-local-media")
         return 0
 
@@ -118,7 +121,8 @@ def main(argv: list[str] | None = None) -> int:
         ),
     )
     print("BFS03B_MODEL:", args.model)
-    print("BFS03B_MODEL_CALLS:", run.attempted_model_calls)
+    print("BFS03B_VERIFICATION_ATTEMPTS:", run.attempted_model_calls)
+    print("BFS03B_MODEL_REQUESTS_CONFIRMED: unknown")
     print("BFS03B_STATUS:", run.status)
     for item in run.assessments:
         dims = item.dimensions
