@@ -33,3 +33,15 @@ User-local BF-S04A acceptance at commit `682a66a`: **45/45 tests PASS**; offline
 BF-S04A.2: introduce an authorized **arbitrary user-script input** (non-fixture) with an existing verified BF-S01 SemanticSearchPlan, deterministic bounded slot batching and budget controls. Later BF-S04B/C will add fact provenance/licensing decisions and authorized source routing. Human reviews editorial plans before invoking BF-S02/BF-S03B, and all media remains license-pending until separate approval.
 
 **Current boundary:** model may propose shots, but it neither discovers nor downloads stock footage, cannot certify the actual 2022 event, and does not grant publishing rights. The user-provided French biographical narrative remains unverified script input.
+
+
+## BF-S04A.1R — user-local failure, targeted response contract correction
+
+**Observed user Windows pilot** at `723d7fa`: local offline tests **29/29 PASS**; dry-run showed **zero Ollama calls**; the user explicitly authorized `RUN` for Gaspard slot 2. Ollama `qwen3-vl:4b-instruct` produced a parseable JSON object, but its top-level `format` was missing or incorrect. The validator rejected it as `invalid-shot-format`, and **no JSON file was written**. This is a real *schema rejection*, not proof of bad story comprehension. Raw response was not logged and cannot be reconstructed; do not guess its shot content.
+
+**Narrow correction without weakening evidence rules:**
+- `make_editorial_shot_prompt(..., shots_only=True)` requests precisely `{"shots": [...]}`. The model writes **editorial shot rows only**; the app is authoritative for `format=bin_finder_editorial_shot_plan_v1`, `plan_id=bf_s04a_model_proposal`, `base_plan_id` and `source_digest`. The prompt identifies required source anchors, 1–5s bounds, archive/stock classification, exclusions, bilingual queries and no claimed rights.
+- `parse_local_editorial_reply` constructs this deterministic envelope **only when model top-level keys equal exactly `{"shots"}`**. Full previous canonical envelopes remain supported and fully verified for backwards compatibility. **Partial wrappers or extra untrusted project-status fields are never silently repaired**. The same strict `parse_editorial_shot_plan` validates all shot content; missing anchors, contradictory exclusions, misclassified media, misleading event claims, forged provenance/rights and timing >5s still fail closed.
+- New offline regression cases explicitly model the observed wrong/missing-format issue, check deterministic trusted envelope, absence of network without approval, one fake loopback request with shot-only reply, no invented shot content, and rejection of forged rights.
+
+**Not claimed:** no second real Ollama result yet; a model may still fail other shot-level fields, or produce weak editorial plans even if structurally valid. No hidden model retries, no weakening of factual/rights approval, no external data calls. User-local follow-up test required on new commit before changing wider pipeline.
