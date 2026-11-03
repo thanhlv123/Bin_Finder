@@ -205,3 +205,21 @@ reference metadata only, never download or usage permission.
 The JSON carries per-candidate licenses, reference flags and per-cue errors for R3.
 `credits.txt` groups unique sources with creator and license links. Discovery license
 metadata does not replace acquisition authorization or final clip approval.
+
+## Matching & selection (R3)
+
+`min_vlm_score` defaults to 0.7 (0..1, env `BIN_FINDER_MATCH_MIN_VLM_SCORE`): with VLM enabled, auto-selection requires a `match`/`partial` verdict meeting this score and `auto_select_threshold`; the cue flag `vlm_missing` means no verdicts are available, or `--no-vlm` is active.
+
+```powershell
+python -m bin_finder.matching footage.json --briefs briefs.json -o selection.json --html review.html --no-vlm
+python -m bin_finder.matching footage.json --briefs briefs.json -o selection.json --html review.html --decisions decisions.json
+```
+
+Luồng duyệt: footage → matching → mở `review.html` → chọn/khóa/bỏ chọn → tải `decisions.json` → chạy lại với `--decisions`.
+Trang HTML chứa CSS/JS, preview phát trực tiếp từ URL HTTPS của nhà cung cấp. Các nút chỉ thay đổi quyết định trong trình duyệt cho tới khi tải JSON.
+
+Cấu hình: sao chép `config/matching.example.json` thành `config/matching.local.json`; biến `BIN_FINDER_MATCH_*` ghi đè từng trường (boolean: `true`/`false`; hosts: JSON hoặc phân cách dấu phẩy).
+VLM bật mặc định, dùng cấu hình F021: `BIN_FINDER_OLLAMA_URL`, `BIN_FINDER_VLM_MODEL` (mặc định `qwen3-vl:4b`), cùng các biến timeout/context F021. Không đọc planning.local.json. `--no-vlm` chạy hoàn toàn offline.
+Tầng 1 hiện là lexical: 0.35 BM25 + 0.25 must-show phrase + 0.35 action + chất lượng tối đa 0.05 − 0.15 mỗi token avoid; giới hạn 0.39 nếu thiếu động từ hành động. Điểm cuối có VLM là 0.4 text + 0.6 VLM, thiếu VLM dùng text và cờ `vlm_missing`.
+Thumbnail không chứng minh chuyển động; kết quả uncertain cần duyệt. YouTube chỉ tham khảo. Selection không cấp quyền tải/dựng; nếu phải dùng lại nguồn thì đánh dấu overlap chưa kiểm chứng. Khóa được áp lại từ decisions khi ID vẫn nằm trong Top K; ID ngoài Top K được cảnh báo, không tự thay thế.
+R1 có `retry_single` mặc định bật: mỗi cue LLM lỗi được thử riêng một lần; lỗi kết nối dừng gọi tiếp.
