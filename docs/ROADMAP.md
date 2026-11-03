@@ -13,7 +13,7 @@ Chạy được headless bằng một lệnh `bin_finder run`. **1.0 đạt khi 
 | Mốc | Mô tả | Tiêu chí xong |
 | --- | --- | --- |
 | R0 — Dọn dẹp | Đồng bộ tài liệu, version 0.2.0 và CI. | Phạm vi thống nhất, giữ lịch sử, toàn bộ pytest pass. |
-| R1 — Visual brief theo câu | AI chuyển từng câu/cụm lời thành visual brief và chuỗi shot bám ngữ cảnh. | Duyệt được brief kịch bản thật, truy vết về lời gốc, chỉ rõ phần không có hình phù hợp. |
+| R1 — Visual brief theo câu (đang làm, PR chờ) | AI chuyển từng câu/cụm lời thành visual brief và chuỗi shot bám ngữ cảnh. | Duyệt được brief kịch bản thật, truy vết về lời gốc, chỉ rõ phần không có hình phù hợp. |
 | R2 — Nguồn footage | Thêm Coverr, Commons, công tắc YouTube, giấy phép; giữ discovery tách acquisition. | Tìm được ứng viên từ nguồn cấu hình; tắt YouTube thì không gọi nguồn; chỉ media được phép mới đủ điều kiện dựng. |
 | R3 — Chấm khớp + AI tự chọn + màn hình duyệt | Embedding lọc nhanh, VLM xác nhận top 3; chọn tay hoặc AI tự chọn, thay/khóa lựa chọn. | Đánh giá footage thật có nhãn người duyệt; giữ source rotation, anti-adjacent reuse, anti-overlap và báo ca không chắc. |
 | R4 — Sản xuất video | TTS, dựng theo mốc thời gian giọng, hiệu ứng, nhạc, phụ đề. | Video xem được với hình, tiếng, phụ đề đồng bộ theo voice thật. |
