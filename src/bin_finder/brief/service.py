@@ -24,8 +24,10 @@ class BriefPlan:
                       "briefs": [ShotBrief.from_dict(b) for b in data["briefs"]]})
 
 
-def plan_briefs(script_text, config, provider=None):
+def plan_briefs(script_text, config, provider=None, limit_cues: int | None = None):
     cues = split_cues(script_text)
+    if limit_cues is not None:
+        cues = cues[:limit_cues]
     selected = config.provider
     if provider is None:
         if selected == "auto":

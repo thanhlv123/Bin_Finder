@@ -279,3 +279,72 @@ không strict vẫn xuất kèm cảnh báo rõ. File xuất được QA lại v
 `qa-report.final.json/html`; thời lượng phải giữ trong ±0.1 giây.
 QA dùng công cụ và định dạng từ `ProductionConfig`; file timeline cũ mặc định
 có phụ đề. Chưa thêm cờ `--qa` vào production; chạy lệnh QA riêng sau dựng.
+
+## Chạy một lệnh (R6)
+
+Cần Python 3.12, ffmpeg/ffprobe trên PATH, VoiceStudio đang mở để tổng hợp giọng;
+Ollama cần chạy nếu dùng provider Ollama hoặc VLM. Với checkout chưa cài package,
+đặt `$env:PYTHONPATH = "src"` trước khi gọi module.
+
+```powershell
+python -m bin_finder run script.txt -o output --config run.json
+python -m bin_finder run --batch scripts -o outputs --config run.json
+python -m bin_finder run script.txt -o output --decisions decisions.json --resume
+```
+
+Các bước ổn định: `brief` → `footage` → `matching` → `production` → `qa` → `export`.
+Đầu ra lần lượt là `brief.json/csv`, `footage.json`, `selection.json` và `review.html`,
+`video.mp4`, `production.json`, `credits.txt` (tệp làm việc ở `work/`),
+`qa-report.json/html`, `final.mp4` và `qa-report.final.json/html`.
+`--until-step brief` chạy thử phần lập brief; `--no-export` bỏ chuẩn hóa cuối.
+`--from-step` yêu cầu `--resume` và các đầu ra trước đó còn hợp lệ.
+
+Runner dừng để duyệt khi lựa chọn chưa đủ điều kiện dựng. Mở `review.html`, cung cấp
+`--decisions D.json --resume`, hoặc dùng `--allow-suggested --resume` nếu chấp nhận
+gợi ý. Gợi ý vẫn phải qua kiểm tra giấy phép và điều kiện dựng của production.
+QA blocker chặn export và trả 3, riêng `loudness`/`true_peak` được chuẩn hóa ở export
+rồi kiểm tra QA bản `final.mp4` (kể cả `--strict-qa`); với `--no-export`, blocker chỉ trả 3 khi
+bật `--strict-qa`. Warning không làm thất bại lần chạy.
+
+| Exit | Ý nghĩa |
+| --- | --- |
+| 0 | Hoàn tất phạm vi yêu cầu |
+| 1 | Lỗi bước; xem state/log rồi `--resume` |
+| 2 | Đầu vào/cấu hình/cờ không hợp lệ |
+| 3 | QA blocker chặn xuất hoặc strict QA thất bại |
+| 4 | Cần người duyệt footage |
+
+Batch chạy các `.txt` và `.md` theo tên, mỗi script vào thư mục theo stem;
+stem phải duy nhất. `batch-summary.json` ghi trạng thái, bước dừng, exit, thời gian
+và đường dẫn video. Ưu tiên exit batch: 3 > 2 > 1 > 4 > 0.
+
+Ví dụ `run.json` (khóa lạ bị từ chối; cờ CLI đè cấu hình):
+
+```json
+{
+  "brief": {"provider": "heuristic"},
+  "footage": {"sources": ["pexels", "commons"], "youtube": false},
+  "matching": {"no_vlm": true},
+  "production": {"no_subtitles": false, "no_icon": false},
+  "qa": {"target_lufs": -14, "strict": true},
+  "limit_cues": 10,
+  "allow_suggested": false
+}
+```
+
+Không đặt credential trong run.json. Các package tự nạp cấu hình provider hiện có.
+Runner lưu duy nhất các tùy chọn không chứa khóa.
+
+`run-state.json` được thay atomic sau mỗi thay đổi: version, script (path/sha256),
+options đã gộp, started_at/finished_at, status, exit_code và steps. Mỗi bước có name,
+status, timestamps, seconds, inputs (path → SHA-256, cùng digest options), outputs,
+error (type/message hoặc null), summary.
+
+`--resume` tái sử dụng bước done/skipped khi hash đầu vào khớp và đủ đầu ra.
+Mỗi bước hash script cùng tất cả đầu ra trước đó. Ngoài ra: brief hash provider,
+limit; footage hash sources/YouTube; matching hash no_vlm và nội dung decisions;
+production hash allow_suggested, music (cả nội dung), subtitles/icon; QA hash target
+LUFS/strict; export hash target LUFS/no_export. Project root thuộc hash mỗi bước.
+Bước thay đổi và mọi bước sau chạy lại. Cấu hình local/env do package nạp không
+được runner hash; khi đổi các cấu hình đó, chạy lại không có `--resume`.
+Không có `--resume` thì chạy lại từ đầu và cảnh báo nếu đã có state.
