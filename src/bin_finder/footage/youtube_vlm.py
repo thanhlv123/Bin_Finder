@@ -6,6 +6,8 @@ import os
 from dataclasses import replace
 from urllib.request import Request
 
+from bin_finder.verification.ollama_vlm import DEFAULT_VLM_MODEL
+
 from bin_finder.matching.vlm_score import OllamaThumbnailJudge
 from bin_finder.verification.ollama_vlm import (
     MAX_RESPONSE_BYTES, VlmResponseError, VlmUnavailable, config_from_env,
@@ -83,7 +85,7 @@ def parse_frame(value: str | dict) -> dict:
 class YouTubeFrameJudge(OllamaThumbnailJudge):
     """Reuse loopback transport with a separate YouTube instruction model."""
 
-    def __init__(self, model: str = "qwen3-vl:4b-instruct", opener: object | None = None) -> None:
+    def __init__(self, model: str = DEFAULT_VLM_MODEL, opener: object | None = None) -> None:
         config = replace(config_from_env(os.environ), model=model)
         super().__init__(config=config, opener=opener)
 

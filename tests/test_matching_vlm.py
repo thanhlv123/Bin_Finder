@@ -150,3 +150,23 @@ def test_selector_thumbnail_flags_and_run_cache(monkeypatch, status):
             assert result.stats['vlm_calls'] == 0
         else:
             assert result.stats['vlm_calls'] == 2
+
+
+@pytest.mark.parametrize("override", [False, True])
+def test_matching_shared_model_payload(monkeypatch: pytest.MonkeyPatch, override: bool) -> None:
+    monkeypatch.delenv("BIN_FINDER_VLM_MODEL", raising=False)
+    monkeypatch.delenv("BIN_FINDER_VLM_NUM_PREDICT", raising=False)
+    if override:
+        monkeypatch.setenv("BIN_FINDER_VLM_MODEL", "qwen3-vl:4b")
+        monkeypatch.setenv("BIN_FINDER_VLM_NUM_PREDICT", "2048")
+
+    class PayloadOpener:
+        def open(self, request: object, timeout: float) -> io.BytesIO:
+            payload = json.loads(request.data)
+            assert payload["think"] is False
+            assert payload["model"] == ("qwen3-vl:4b" if override else "qwen3-vl:4b-instruct")
+            assert payload["options"]["num_predict"] == (2048 if override else 512)
+            verdict = {"match": "match", "score": 0.9, "reason": "forest", "needs_motion_check": False}
+            return io.BytesIO(json.dumps({"message": {"content": json.dumps(verdict)}}).encode())
+
+    assert OllamaThumbnailJudge(opener=PayloadOpener()).judge({}, "forest", {}, b"frame").score == 0.9

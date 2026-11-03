@@ -206,7 +206,7 @@ def test_non_loopback_or_decorated_endpoints_rejected(url):
 def test_config_from_env_defaults_and_validation():
     config = config_from_env({})
     assert (config.mode, config.model, config.url, config.timeout, config.frames) == (
-        "auto", "qwen3-vl:4b", "http://127.0.0.1:11434", 120.0, 3)
+        "auto", "qwen3-vl:4b-instruct", "http://127.0.0.1:11434", 120.0, 3)
     custom = config_from_env({"BIN_FINDER_VLM_MODEL": "llava:7b", "BIN_FINDER_VLM_FRAMES_PER_UNIT": "2",
                               "BIN_FINDER_VLM_TIMEOUT_SECONDS": "30", "BIN_FINDER_VLM_MODE": "HEURISTIC"})
     assert (custom.model, custom.frames, custom.timeout, custom.mode) == ("llava:7b", 2, 30.0, "heuristic")
@@ -218,11 +218,11 @@ def test_config_from_env_defaults_and_validation():
 
 
 def test_token_budget_defaults_overrides_and_bounds():
-    # Real-footage finding: the Thinking default model needs more than Ollama's 4096 window
+    # Shared Instruct model uses a bounded JSON output budget
     # and a 600-token output cap, otherwise the answer is empty and the heuristic is used.
     config = config_from_env({})
-    assert (config.num_ctx, config.num_predict) == (8192, 2048)
-    assert (VlmConfig().num_ctx, VlmConfig().num_predict) == (8192, 2048)
+    assert (config.num_ctx, config.num_predict) == (8192, 512)
+    assert (VlmConfig().num_ctx, VlmConfig().num_predict) == (8192, 512)
     custom = config_from_env({"BIN_FINDER_VLM_NUM_CTX": "16384", "BIN_FINDER_VLM_NUM_PREDICT": "4096"})
     assert (custom.num_ctx, custom.num_predict) == (16384, 4096)
     assert config_from_env({"BIN_FINDER_VLM_NUM_CTX": "2048", "BIN_FINDER_VLM_NUM_PREDICT": "128"}).num_ctx == 2048
@@ -241,12 +241,16 @@ def test_token_budget_defaults_overrides_and_bounds():
 def test_payload_carries_configured_num_ctx_and_num_predict():
     opener = FakeOpener(envelope(GOOD))
     verifier(opener).verify(SCENE, [unit()])
-    options = json.loads(opener.requests[0][0].data)["options"]
-    assert (options["num_ctx"], options["num_predict"]) == (8192, 2048)
+    payload = json.loads(opener.requests[0][0].data)
+    assert payload["think"] is False
+    options = payload["options"]
+    assert (options["num_ctx"], options["num_predict"]) == (8192, 512)
     assert (options["temperature"], options["seed"]) == (0, 0)
     opener = FakeOpener(envelope(GOOD))
     verifier(opener, num_ctx=12288, num_predict=3000).verify(SCENE, [unit()])
-    options = json.loads(opener.requests[0][0].data)["options"]
+    payload = json.loads(opener.requests[0][0].data)
+    assert payload["think"] is False
+    options = payload["options"]
     assert (options["num_ctx"], options["num_predict"]) == (12288, 3000)
 
 
@@ -336,7 +340,7 @@ def test_nonfinite_values_are_never_returned():
 def test_primary_success_uses_real_vlm_result_and_identifies_provider():
     results = verifier(FakeOpener(envelope(GOOD))).verify(SCENE, [unit(1), unit(2)])
     assert [r.unit_id for r in results] == ["u1", "u2"]
-    assert all(r.provider == "ollama-vlm:qwen3-vl:4b" for r in results)
+    assert all(r.provider == "ollama-vlm:qwen3-vl:4b-instruct" for r in results)
     assert verifier(FakeOpener(envelope(GOOD)), model="llava:7b").name == "ollama-vlm:llava:7b"
 
 
@@ -373,7 +377,7 @@ def test_per_unit_failure_only_falls_back_that_unit():
     results = provider.verify(SCENE, units)
     assert [r.unit_id for r in results] == ["u1", "u2", "u3", "u4"]
     assert [r.provider for r in results] == [
-        "ollama-vlm:qwen3-vl:4b", "heuristic-context", "ollama-vlm:qwen3-vl:4b", "heuristic-context"]
+        "ollama-vlm:qwen3-vl:4b-instruct", "heuristic-context", "ollama-vlm:qwen3-vl:4b-instruct", "heuristic-context"]
 
 
 def test_composite_always_returns_one_ordered_entry_per_unit():
@@ -417,7 +421,7 @@ def test_reranker_scoring_and_top_n_unchanged():
     assert [(v.status, v.final_score, v.verification_score) for v in via_vlm] == \
            [(v.status, v.final_score, v.verification_score) for v in via_stub]
     assert [v.status for v in via_vlm] == ["verified", "verified", "outside-top-n", "outside-top-n"]
-    assert via_vlm[0].verification.provider == "ollama-vlm:qwen3-vl:4b"
+    assert via_vlm[0].verification.provider == "ollama-vlm:qwen3-vl:4b-instruct"
 
 
 def test_f018_keyword_fallback_still_works_when_vlm_fails():
@@ -557,7 +561,7 @@ def test_real_urllib_and_ffmpeg_against_loopback_stub_server(tmp_path):
         port = server.server_address[1]
         real = OllamaVisionVerifier(VlmConfig(url=f"http://127.0.0.1:{port}", timeout=10))
         result = real.verify(SCENE, [RetrievalUnit("real", str(media), 0.5, 4.5)])[0]
-        assert result is not None and result.provider == "ollama-vlm:qwen3-vl:4b"
+        assert result is not None and result.provider == "ollama-vlm:qwen3-vl:4b-instruct"
         path, body = seen[0]
         images = body["messages"][0]["images"]
         assert path == "/api/chat" and len(images) == 3

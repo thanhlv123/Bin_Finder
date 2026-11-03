@@ -4,13 +4,15 @@ import json
 import os
 from pathlib import Path
 
+from bin_finder.verification.ollama_vlm import DEFAULT_VLM_MODEL
+
 
 @dataclass(frozen=True)
 class FootageConfig:
     sources: list[str] = field(default_factory=lambda: ["pexels", "pixabay", "commons", "coverr"])
     youtube_enabled: bool = False
     youtube_reuse: bool = False
-    youtube_vlm_model: str = "qwen3-vl:4b-instruct"
+    youtube_vlm_model: str = DEFAULT_VLM_MODEL
     youtube_min_frame_score: float = 0.6
     videos_per_cue: int = 6
     frames_per_video: int = 8

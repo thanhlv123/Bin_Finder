@@ -168,6 +168,7 @@ class OllamaThumbnailJudge:
         payload = {
             'model': self.config.model,
             'stream': False,
+            'think': False,
             'format': VERDICT_SCHEMA,
             'options': {
                 'temperature': 0,
