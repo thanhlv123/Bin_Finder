@@ -15,6 +15,33 @@ from bin_finder.production.timeline import Shot, Timeline
 from bin_finder.production.tts import wav_duration
 
 
+@pytest.mark.parametrize("version, option", [
+    ("ffmpeg version 9.0.2-essentials_build", "-/filter_complex"),
+    ("ffmpeg version 6.1.1", "-filter_complex_script"),
+    ("ffmpeg version 2025-09-04-git-2611874a50-essentials_build", "-/filter_complex"),
+    ("ffmpeg version 7.0", "-/filter_complex"),
+])
+def test_filter_script_version(version, option):
+    from bin_finder.production.render import _filter_script_option
+    assert _filter_script_option(version) == option
+
+
+def test_filter_script_arguments_cache(monkeypatch, tmp_path):
+    from unittest.mock import Mock
+    from bin_finder.production.render import _ffmpeg_filter_script_option, filter_script_arguments
+    probe = Mock(return_value=subprocess.CompletedProcess([], 0, "ffmpeg version 9.0.2-essentials_build"))
+    monkeypatch.setattr("bin_finder.production.render.subprocess.run", probe)
+    _ffmpeg_filter_script_option.cache_clear()
+    try:
+        for name in ("assembly.ffgraph", "mix.ffgraph"):
+            path = tmp_path / "work space" / name
+            assert filter_script_arguments("custom-ffmpeg", path) == ["-/filter_complex", str(path)]
+        probe.assert_called_once_with(["custom-ffmpeg", "-version"], capture_output=True, text=True,
+                                      encoding="utf-8", errors="replace", check=True)
+    finally:
+        _ffmpeg_filter_script_option.cache_clear()
+
+
 def color_timeline():
     shots = [Shot(f"cue-{index}", text, start, end, f"source-{index}", "pexels", "", "selected", {})
              for index, (text, start, end) in enumerate([("Red sun", 0, 1), ("Green tree", 1, 2), ("Blue sea", 2, 5)])]

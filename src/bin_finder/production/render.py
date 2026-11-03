@@ -1,12 +1,40 @@
 """Voice-preserving transition assembly, overlays and audio mixing."""
+from functools import lru_cache
 from pathlib import Path
+import re
+import subprocess
 from typing import Callable
 
+from . import ProductionError
 from .config import ProductionConfig
 from .icons import write_subscribe_icon
 from .media import normalize_shot, run_ffmpeg
 from .subtitles import write_subtitles
 from .timeline import Timeline
+
+
+def _filter_script_option(version: str) -> str:
+    """Date-based Git builds and FFmpeg 7+ support option values from files."""
+    match = re.search(r"ffmpeg version (\d+)", version)
+    if not match:
+        raise ProductionError("Could not determine FFmpeg version")
+    return "-/filter_complex" if int(match.group(1)) >= 7 else "-filter_complex_script"
+
+
+@lru_cache(maxsize=None)
+def _ffmpeg_filter_script_option(ffmpeg: str) -> str:
+    """Probe each configured executable only once."""
+    try:
+        result = subprocess.run([ffmpeg, "-version"], capture_output=True, text=True,
+                                encoding="utf-8", errors="replace", check=True)
+    except (OSError, subprocess.CalledProcessError):
+        raise ProductionError("Could not determine FFmpeg version") from None
+    return _filter_script_option(result.stdout)
+
+
+def filter_script_arguments(ffmpeg: str, path: Path) -> list[str]:
+    """Keep filter graphs in files while supporting older FFmpeg releases."""
+    return [_ffmpeg_filter_script_option(ffmpeg), str(path)]
 
 
 def transition_durations(timeline: Timeline, config: ProductionConfig) -> list[float]:
@@ -98,7 +126,8 @@ def render_video(timeline: Timeline, narration_path: Path, output: Path, work_di
     arguments = [config.ffmpeg, "-v", "error", "-y", "-filter_complex_threads", "1"]
     for path in shot_paths:
         arguments.extend(["-i", str(path)])
-    arguments.extend(["-filter_complex_script", str(graph_path), "-map", f"[{label}]", "-an", "-t",
+    arguments.extend(filter_script_arguments(config.ffmpeg, graph_path))
+    arguments.extend(["-map", f"[{label}]", "-an", "-t",
                       str(timeline.duration), "-c:v", "libx264", "-preset", "fast", "-crf", "20",
                       "-pix_fmt", "yuv420p", "-threads", "2", str(joined)])
     run_ffmpeg(arguments)
@@ -173,7 +202,8 @@ def _mix(timeline: Timeline, narration_path: Path, joined: Path, output: Path,
             next_input += 1
     graph_path = work_dir / "mix.ffgraph"
     graph_path.write_text(";\n".join(filters), encoding="utf-8")
-    arguments.extend(["-filter_complex_script", str(graph_path), "-map", f"[{video_label}]", "-map", "[audio]",
+    arguments.extend(filter_script_arguments(config.ffmpeg, graph_path))
+    arguments.extend(["-map", f"[{video_label}]", "-map", "[audio]",
                       "-t", str(timeline.duration), "-r", str(config.fps), "-c:v", "libx264", "-preset", "fast",
                       "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
                       "-movflags", "+faststart", "-threads", "2", str(output.resolve())])
