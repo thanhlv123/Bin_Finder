@@ -1,26 +1,12 @@
 # Bin Finder
 
-Bin Finder is a Windows-local desktop application for discovering, analyzing, reviewing, selecting, and exporting script-matched footage.
+Bin Finder is a Windows-local application whose 1.0 goal is **script -> finished video**: AI visual briefs per sentence or narration phrase; multi-source footage discovery (Pexels, Pixabay, Coverr, Wikimedia Commons, Storyblocks when an API is available, and switchable YouTube); two-stage matching (fast embedding filtering, then VLM verification of the top 3); human or AI selection; TTS voice; voice-timed editing with effects, music and subtitles; quality checks; and MP4 + credits export.
+
+The 1.0 pipeline must also run headlessly with one `bin_finder run` command. Acceptance requires a complete real video approved by the project owner. These are roadmap goals; the merged implementation currently provides the footage discovery, review and portable export foundation.
 
 ## Current milestone status
 
-- **F001.5 GUI workspace:** PASS
-- **F002 provider discovery:** PASS
-- **F003 candidate intelligence:** PASS
-- **F004 hybrid retrieval:** PASS
-- **F005 context verification / VLM reranking contract:** PASS
-- **F006 smart clip planning/extraction:** PASS
-- **F007 local footage intelligence:** PASS
-- **F008 source diversity:** PASS
-- **F009 human review / A-B evaluation:** PASS
-- **F010 acceptance gate / AI_Video_Editor adapter:** PASS
-- **F014 workflow review / explicit final clip selection:** PASS (offline)
-- **F015 final footage export library:** PASS (offline + real FFmpeg smoke)
-- **F016 session persistence / recovery:** PASS (Windows CI 407 passed, 0 skipped + real FFmpeg restore/export smoke)
-- **F017 stable handoff contract / portable package:** PASS (Windows CI + real FFmpeg handoff acceptance: run #157, 471 passed, 0 skipped)
-- **F020 portable handoff GUI:** implemented, local acceptance PASS (Windows CI pending)
-- **F019 long-form acceptance policy:** implemented, local acceptance PASS (Windows CI pending)
-- **F018 production scene planning / context enrichment:** implemented, local acceptance PASS (Windows CI pending)
+See the [v2 roadmap and milestone history](docs/ROADMAP.md) for R0-R7, completion criteria and retained research ideas. F001-F020 are merged with CI passing; F021 is PR #29, awaiting merge. R0 aligns documentation, version and CI with the new direction.
 
 Candidate approval for acquisition/analysis is separate from final clip approval.
 Only explicitly approved, verified local clip proposals create final selections
@@ -33,7 +19,7 @@ CSV index. Source hashes are revalidated; incomplete, cancelled or failed runs
 publish no completed library, and existing completed exports are never overwritten.
 An optional F010 adapter references the extracted files with local 0-based ranges,
 using the original source-coordinate readiness report. Original source ranges and
-hashes remain in the F015 manifest. No final video is rendered. See
+hashes remain in the F015 manifest. The current footage export does not yet render a final video; R4-R6 add production and headless delivery. See
 [F015 usage and offline FFmpeg acceptance](docs/F015_FINAL_FOOTAGE_EXPORT.md).
 
 The accepted GUI layout remains fixed. New retrieval capabilities are added behind the existing panels rather than redesigning the workspace.
@@ -62,7 +48,9 @@ Script scene
   -> source diversity / anti-overlap
   -> human review / evaluation
   -> selected-footage filmstrip
-  -> clean export library + manifests
+  -> clean export library + manifests (current foundation)
+  -> TTS voice + voice-timed editing / effects / music / subtitles (v2 goal)
+  -> quality checks -> MP4 + credits (v2 goal)
 ```
 
 ## Candidate intelligence
@@ -120,7 +108,7 @@ The search-results grid remains exactly three cards per row. Review/export geome
 - Adjacent scenes may not reuse the same source video.
 - The same source may return after at least one different source.
 - Overlapping ranges from the same source are invalid.
-- Final output is a clean folder containing approved clips plus machine-readable manifests.
+- The footage library is a clean folder containing approved clips plus machine-readable manifests; the 1.0 final delivery adds MP4 + credits.
 
 ## Provider secrets
 
@@ -157,8 +145,9 @@ contracts coexist, and neither schema changed:
 - `bin_finder_handoff_v1` — the portable contract intended for a future
   AI_Video_Editor import.
 
-Bin Finder ends at an approved, verified, portable footage package. AI_Video_Editor
-integration is not done: it later starts at validated import of the handoff. See
+The existing F017 stage produces an approved, verified, portable footage package.
+The v2 roadmap extends Bin Finder through final video production; an AI_Video_Editor
+consumer remains outside 1.0. See
 [F017 details](docs/F017_STABLE_HANDOFF_CONTRACT.md).
 
 F018 scene planning: the script-splitting action now uses the deterministic
@@ -182,4 +171,4 @@ default, which makes a normal GUI export write `_bin_finder_handoff.json`
 AI_Video_Editor consumer integration is not implemented. See
 [F020 details](docs/F020_PORTABLE_HANDOFF_GUI.md).
 
-See `docs/ROADMAP.md` for the milestone plan.
+See the [v2 roadmap](docs/ROADMAP.md) for the milestone plan.
