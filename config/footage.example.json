@@ -11,5 +11,6 @@
   "min_width": 1280,
   "min_height": 720,
   "orientation": "landscape",
-  "exclude_unusable": true
+  "exclude_unusable": true,
+  "youtube_max_candidates_per_cue": 3
 }

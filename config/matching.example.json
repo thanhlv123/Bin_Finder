@@ -15,5 +15,6 @@
     "upload.wikimedia.org",
     "cdn.coverr.co"
   ],
-  "timeout_sec": 30.0
+  "timeout_sec": 30.0,
+  "youtube_preference": 0.1
 }

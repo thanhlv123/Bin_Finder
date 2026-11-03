@@ -19,7 +19,7 @@ STEPS = ("brief", "footage", "matching", "production", "qa", "export")
 OUTPUTS = (("brief.json", "brief.csv"), ("footage.json",), ("selection.json", "review.html"),
            ("video.mp4", "production.json", "credits.txt"), ("qa-report.json", "qa-report.html"),
            ("final.mp4", "qa-report.final.json", "qa-report.final.html"))
-OPTION_KEYS = (("brief_provider", "limit_cues", "project_root"), ("sources", "youtube", "project_root"),
+OPTION_KEYS = (("brief_provider", "limit_cues", "project_root"), ("sources", "youtube", "youtube_reuse", "project_root"),
                ("no_vlm", "decisions", "project_root"),
                ("allow_suggested", "music", "no_subtitles", "no_icon", "project_root"),
                ("target_lufs", "strict_qa", "project_root"), ("target_lufs", "no_export", "project_root"))
@@ -32,6 +32,7 @@ class RunOptions:
     brief_provider: str | None = None
     sources: list[str] | None = None
     youtube: bool | None = None
+    youtube_reuse: bool | None = None
     no_vlm: bool = False
     decisions: Path | None = None
     allow_suggested: bool = False
@@ -52,6 +53,7 @@ class RunServices:
     """Replace network, speech, media and QA boundaries in offline tests."""
     brief_provider_factory: Callable | None = None
     footage_registry_factory: Callable | None = None
+    youtube_service_factory: Callable | None = None
     matching_scorer: Callable | None = None
     matching_judge: object | None = None
     matching_fetch: Callable | None = None
@@ -96,6 +98,9 @@ def inputs_for(index: int, script: Path, directory: Path, options: RunOptions) -
     values = asdict(options)
     relevant = {key: values[key] for key in OPTION_KEYS[index]}
     result = {str(path): digest(path) for path in paths}
+    if index >= 1:
+        from bin_finder.footage.config import FootageConfig
+        relevant["youtube_reuse"] = options.youtube_reuse if options.youtube_reuse is not None else FootageConfig.load(options.project_root).youtube_reuse
     result["options"] = sha256(json.dumps(relevant, sort_keys=True, default=str).encode()).hexdigest()
     return result
 
@@ -206,6 +211,9 @@ def _run_pipeline(script: Path, out_dir: Path, options: RunOptions, *, services:
             before_start = index < STEPS.index(options.from_step or "brief")
             if before_start and not reusable:
                 raise ValueError(f"--from-step requires validated --resume artifacts: {name}")
+            if options.from_step and not before_start:
+                reusable = False
+                invalidated = True
             if reusable and not invalidated:
                 entry.update(prior, status="skipped")
                 log(f"[{index + 1}/6] {name}: bỏ qua, đã xong")
@@ -231,7 +239,7 @@ def _run_pipeline(script: Path, out_dir: Path, options: RunOptions, *, services:
             persist(state_path, state)
             if name == "matching":
                 try:
-                    selections(directory, options.allow_suggested)
+                    selections(directory, options.allow_suggested, options)
                 except MissingSelectionError as error:
                     lines = str(error).splitlines()[1:]
                     log(f"Cần duyệt {len(lines)} cue:\n" + "\n".join(lines[:10]))

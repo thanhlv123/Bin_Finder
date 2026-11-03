@@ -32,10 +32,12 @@ def write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def selections(directory: Path, allow_suggested: bool) -> None:
+def selections(directory: Path, allow_suggested: bool, options: Any = None) -> None:
     """Use the exact production eligibility gate."""
     resolve_selections(SelectionPlan.from_dict(read_json(directory / "selection.json")),
-                       FootagePlan.from_dict(read_json(directory / "footage.json")), allow_suggested)
+                       FootagePlan.from_dict(read_json(directory / "footage.json")), allow_suggested,
+                       effective_reuse(options) if options else False,
+                       ProductionConfig.load(options.project_root).youtube_transform if options else None)
 
 
 def write_brief_csv(path: Path, plan: BriefPlan, config: BriefConfig) -> None:
@@ -65,6 +67,13 @@ def run_brief(script: Path, directory: Path, options: Any, services: Any) -> dic
     return {"cues": len(plan.cues)}
 
 
+def effective_reuse(options: Any) -> bool:
+    """Resolve project opt-in consistently at every stage boundary."""
+    if options.youtube_reuse is not None:
+        return options.youtube_reuse
+    return FootageConfig.load(options.project_root).youtube_reuse
+
+
 def run_footage(script: Path, directory: Path, options: Any, services: Any) -> dict:
     """Execute the footage stage through existing package functions."""
     root = options.project_root
@@ -73,8 +82,11 @@ def run_footage(script: Path, directory: Path, options: Any, services: Any) -> d
         config = replace(config, sources=options.sources)
     if options.youtube is not None:
         config = replace(config, youtube_enabled=options.youtube)
+    config = replace(config, youtube_reuse=effective_reuse(options),
+                     cache_dir=str(root / config.cache_dir), usage_dir=str(root / config.usage_dir) if config.usage_dir else str(directory))
+    youtube_service = services.youtube_service_factory(config) if services.youtube_service_factory and config.youtube_reuse else None
     registry = (services.footage_registry_factory or create_registry)(root)
-    plan = search_footage(BriefPlan.from_dict(read_json(directory / "brief.json")), registry, config)
+    plan = search_footage(BriefPlan.from_dict(read_json(directory / "brief.json")), registry, config, youtube_service=youtube_service)
     write_json(directory / "footage.json", plan.to_dict())
     return {"sources": plan.candidates_per_source, "candidates": sum(plan.candidates_per_source.values())}
 
@@ -110,6 +122,7 @@ def run_production(script: Path, directory: Path, options: Any, services: Any) -
             command.append(flag)
     if options.music:
         command.extend(["--music", str(options.music)])
+    command.append("--youtube-reuse" if effective_reuse(options) else "--no-youtube-reuse")
     engine = services.speech_engine_factory() if services.speech_engine_factory else None
     produce(production_parser().parse_args(command), engine, services.media_loader or acquire_media,
             services.media_probe or probe_media, services.renderer or render_video)

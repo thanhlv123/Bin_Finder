@@ -57,6 +57,8 @@ def check_media(timeline: Timeline, credits: str | None, check_sources: bool = F
     if credits is None:
         findings.append(Finding("missing_credits", "blocker", "Thiếu credits.txt."))
     source_cues = {}
+    youtube_selected = []
+    previous_youtube = None
     previous = None
     for shot in timeline.shots:
         def add(code: str, severity: str, message: str) -> None:
@@ -70,8 +72,22 @@ def check_media(timeline: Timeline, credits: str | None, check_sources: bool = F
         if not 0.5 <= shot.speed <= 2:
             add("clip_speed", "warning", "Tốc độ clip ngoài khoảng 0.5–2.0.")
         license_info = shot.license or {}
-        if not license_info or license_info.get("usable_in_video") is not True or shot.provider.lower() == "youtube":
+        if not license_info or license_info.get("usable_in_video") is not True or (shot.provider.lower() == "youtube" and not timeline.youtube_reuse):
             add("unusable_license", "blocker", "Nguồn không được phép dùng trong video.")
+        if shot.provider.lower() == "youtube" and timeline.youtube_reuse:
+            from bin_finder.footage.youtube_usage import violations
+            from bin_finder.production.youtube_transform import intersects
+            if license_info.get("kind") != "youtube_reuse" or not shot.transforms or "remove_audio" not in shot.transforms:
+                add("youtube_untransformed", "blocker", "YouTube clip lacks required transformations.")
+            else:
+                add("youtube_reuse", "warning", "YouTube reuse enabled for this project.")
+            crop = shot.youtube.get("crop", [0, 0, 1, 1])
+            if any(region["kind"] == "channel_watermark" and intersects(crop, region["box"]) for region in shot.youtube.get("regions", [])):
+                add("youtube_watermark", "blocker", "Channel watermark remains in YouTube clip.")
+            for reason in violations(shot.youtube, youtube_selected, previous_youtube):
+                add(reason, "blocker", "YouTube source selection limit violated.")
+            youtube_selected.append(shot.youtube)
+        previous_youtube = shot.youtube if shot.provider.lower() == "youtube" else None
         source_url = license_info.get("source_url")
         if not source_url or not license_info.get("license_name"):
             add("unclear_license", "warning", "Quyền chưa rõ: thiếu tên giấy phép hoặc URL nguồn.")

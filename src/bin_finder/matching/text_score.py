@@ -104,7 +104,7 @@ def score_candidates(brief, cue_text, candidates):
             f"Quality bonus: {quality_bonus:.3f}",
             f"Avoid penalty: {avoid_count * AVOID_PENALTY:.2f}",
         ]
-        if candidate.get("reference_only") or candidate.get("provider") == "youtube":
+        if candidate.get("reference_only") or (candidate.get("provider") == "youtube" and candidate.get("license", {}).get("kind") != "youtube_reuse"):
             candidate["reference_only"] = True
             reasons.append("Reference only; never auto-select")
         result.append(ScoredCandidate(candidate, round(max(0, min(1, score)), 6), reasons))

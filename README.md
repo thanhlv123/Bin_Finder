@@ -39,7 +39,7 @@ python -m bin_finder.production selection.json --footage footage.json -o output/
 
 Production stops before speech/downloads for unresolved or unusable footage.
 `--allow-suggested` explicitly permits eligible suggestions and marks them in credits
-and `production.json`. YouTube and reference-only footage remain ineligible.
+and `production.json`. YouTube remains ineligible by default; R6.5 adds project-scoped reuse below. Reference-only footage remains ineligible.
 Use `--limit-cues 3` for a preview, `--music PATH`, `--no-subtitles`, `--no-icon`,
 `--work-dir DIR`, or `--project-root DIR` as needed. Outputs are the MP4,
 `credits.txt` and `production.json` in the output directory; intermediate clips and
@@ -348,3 +348,50 @@ LUFS/strict; export hash target LUFS/no_export. Project root thuộc hash mỗi 
 Bước thay đổi và mọi bước sau chạy lại. Cấu hình local/env do package nạp không
 được runner hash; khi đổi các cấu hình đó, chạy lại không có `--resume`.
 Không có `--resume` thì chạy lại từ đầu và cảnh báo nếu đã có state.
+
+## Footage YouTube (R6.5)
+
+Reuse is **off by default**. Enable it per project in `config/footage.local.json`
+with `"youtube_reuse": true`, through `BIN_FINDER_FOOTAGE_YOUTUBE_REUSE=true`,
+or with `--youtube-reuse` (`--no-youtube-reuse` disables it). Reuse implies YouTube discovery.
+The run configuration accepts `{"footage": {"youtube_reuse": true}}`:
+
+```powershell
+python -m bin_finder run script.txt -o output/k1 --youtube-reuse
+python -m bin_finder.footage brief.json -o output/k1/footage.json --youtube-reuse
+python -m bin_finder.production selection.json --footage output/k1/footage.json -o output/k1/video.mp4 --youtube-reuse
+```
+
+Install `yt-dlp` and FFmpeg on PATH and run the existing Ollama vision model
+(`qwen3-vl:4b`, configured by the existing VLM settings). No YouTube API key or new Python
+package is required. `footage.local.json` also accepts `yt_dlp`, `ffmpeg`, `cache_dir`,
+`usage_dir`, `videos_per_cue` (6), `frames_per_video` (8), `window_seconds` (8),
+`max_workers` (4), and `cc_only` (false); each has a `BIN_FINDER_FOOTAGE_` environment override.
+
+YouTube queries from the brief drive keyless search. Info and storyboard grids are cached
+in `.cache/footage/youtube/`, prepared concurrently, cropped with FFmpeg, then scored by
+Ollama for visual relevance and region locations. Talking heads, text slides and maps are
+rejected. Only video windows are acquired; two real clip frames check scene drift before
+keeping a 3-5 second segment. Individual failures produce warnings and leave other sources available.
+
+Before rendering, clips receive a 16:9 crop avoiding channel watermarks (unavoidable watermarks
+reject the clip), regional blur for remaining product brands/text/subtitles, optional horizontal
+mirror (disabled when text remains), and deterministic 1-3 degree rotation with extra zoom to
+cover corners. Original YouTube audio is removed. `config/production.local.json` accepts
+`"youtube_transform": {"min_zoom": 1.08, "max_zoom": 1.4, "mirror": true, "rotate_degrees": 3}`;
+overrides are `BIN_FINDER_PROD_YT_MIN_ZOOM`, `MAX_ZOOM`, `MIRROR`, and `ROTATE_DEGREES`
+(with the same prefix for each). Transformation details appear on each shot in `production.json`.
+
+Adjacent shots must use different videos; intervals from the same video need a 60-second gap,
+with at most 3 clips/video and 10 clips/channel/project. `OUT_DIR/youtube-usage.json` (or
+`usage_dir`) accumulates accepted intervals across successful production runs; re-rendering
+an identical interval does not increment it. Discovery does not consume slots. QA checks the
+actual timeline and blocks source-limit violations, missing transforms, or remaining channel
+watermarks. Opted-in transformed YouTube shots otherwise produce a `youtube_reuse` warning.
+`credits.txt` has a separate YouTube section with title, channel, timestamped link, original
+segment coordinates and transformations.
+
+Reusing others' YouTube content carries copyright and reused-content policy risks;
+transformations do not grant rights. The switch is off by default.
+
+YouTube reuse reserves a separate `youtube_max_candidates_per_cue` quota (default 3) in `config/footage.local.json`, overridden by `BIN_FINDER_FOOTAGE_YOUTUBE_MAX_CANDIDATES_PER_CUE`; stock retains its own `max_candidates_per_cue` quota. Matching uses verified storyboard scores for YouTube and adds `youtube_preference` (default 0.1, clamped to [0,1]) from `config/matching.local.json` or `BIN_FINDER_MATCH_YOUTUBE_PREFERENCE` only for matching, non-reference clips when reuse is enabled. Reuse restrictions still apply. `--resume --from-step footage` reuses validated earlier artifacts and reruns footage and every subsequent step.

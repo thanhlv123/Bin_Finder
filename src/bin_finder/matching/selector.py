@@ -5,20 +5,23 @@ from time import perf_counter
 
 from .models import SelectionPlan
 from .text_score import score_candidates
-from .vlm_score import OllamaThumbnailJudge, ThumbnailFetcher, VlmUnavailable, VlmResponseError
+from .vlm_score import OllamaThumbnailJudge, ThumbnailFetcher, VlmUnavailable, VlmResponseError, VisualVerdict
 
 TEXT_WEIGHT = 0.4
 VISUAL_WEIGHT = 0.6
 
 _ROW_FIELDS = (
     "source_id", "provider", "title", "thumbnail_url", "preview_url", "source_url",
-    "duration", "width", "height", "license", "reference_only",
+    "duration", "width", "height", "license", "reference_only", "youtube",
 )
 
 
-def _rank_cue(cue, brief, config, judge, fetch, unavailable):
+def _rank_cue(cue, brief, config, judge, fetch, unavailable, youtube_reuse: bool = False):
     start = perf_counter()
-    scored = score_candidates(brief, cue["text"], cue["candidates"])[:config.top_k]
+    ordinary = [candidate for candidate in cue["candidates"] if not candidate.get("youtube")]
+    youtube_candidates = [candidate for candidate in cue["candidates"] if candidate.get("youtube")]
+    scored = score_candidates(brief, cue["text"], ordinary)[:config.top_k]
+    scored.extend(score_candidates(brief, cue["text"], youtube_candidates)[:config.top_k])
     text_seconds = perf_counter() - start
     start = perf_counter()
     ranked = []
@@ -28,8 +31,14 @@ def _rank_cue(cue, brief, config, judge, fetch, unavailable):
     for item in scored:
         candidate = item.candidate
         verdict = None
+        youtube = candidate.get("youtube") or {}
+        if candidate.get("license", {}).get("kind") == "youtube_reuse" and not candidate.get("reference_only") and not youtube.get("scene_drift"):
+            score = youtube.get("storyboard_score", 0)
+            if type(score) in (int, float) and 0 <= score <= 1:
+                verdict = VisualVerdict("match" if score >= config.min_vlm_score else "no_match", score, "Verified YouTube storyboard and clip frames", False)
         can_judge = (
-            config.vlm_enabled
+            not youtube
+            and config.vlm_enabled
             and not unavailable
             and not candidate.get("reference_only")
             and candidate.get("thumbnail_url")
@@ -52,12 +61,26 @@ def _rank_cue(cue, brief, config, judge, fetch, unavailable):
         final_score = item.text_score
         if verdict:
             final_score = round(TEXT_WEIGHT * item.text_score + VISUAL_WEIGHT * verdict.score, 6)
+        youtube_verified = (
+            candidate.get("license", {}).get("kind") == "youtube_reuse"
+            and not candidate.get("reference_only")
+            and not youtube.get("scene_drift")
+            and verdict is not None
+        )
+        youtube_preferred = youtube_reuse and youtube_verified and verdict.match == "match"
+        if youtube_verified:
+            final_score = verdict.score
+        if youtube_preferred:
+            final_score = round(min(1.0, max(0.0, final_score + config.youtube_preference)), 6)
         row.update(
+            youtube_preferred=youtube_preferred,
             text_score=item.text_score,
             vlm=verdict.to_dict() if verdict else None,
             final_score=final_score,
             reasons=list(item.reasons),
         )
+        if youtube_preferred:
+            row["reasons"].append("YouTube storyboard verified; reuse preference applied")
         if not verdict:
             row["reasons"].append("VLM missing; lexical evidence only")
         ranked.append(row)
@@ -76,7 +99,8 @@ def _eligible(row, config):
         return False
     return (
         not row["reference_only"]
-        and row["text_score"] >= config.min_text_score
+        and (row.get("youtube_preferred") or row["text_score"] >= config.min_text_score)
+        and not (row.get("youtube") or {}).get("scene_drift")
         and row["final_score"] >= config.auto_select_threshold
         and (row.get("license") or {}).get("usable_in_video", True)
     )
@@ -149,12 +173,19 @@ def select_footage(footage_plan, brief_plan, config, judge=None, fetch=None):
     cues = []
     used_sources = set()
     providers = []
+    from pathlib import Path
+    from bin_finder.footage.youtube_usage import read_usage, usage_context
+    historical = read_usage(Path(footage_plan.youtube_usage_path)) if footage_plan.youtube_usage_path else []
+    selected_youtube = []
+    previous_youtube = None
     calls = 0
     text_seconds = 0.0
     visual_seconds = 0.0
     for cue in footage_plan.cues:
+        if not footage_plan.youtube_reuse:
+            cue = {**cue, "candidates": [{**candidate, "reference_only": True} if candidate.get("provider") == "youtube" else candidate for candidate in cue["candidates"]]}
         ranked, text_elapsed, visual_elapsed, cue_calls, unavailable, thumbnail_flags = _rank_cue(
-            cue, briefs.get(cue["cue_id"]), config, judge, fetch, unavailable,
+            cue, briefs.get(cue["cue_id"]), config, judge, fetch, unavailable, footage_plan.youtube_reuse,
         )
         text_seconds += text_elapsed
         visual_seconds += visual_elapsed
@@ -170,7 +201,12 @@ def select_footage(footage_plan, brief_plan, config, judge=None, fetch=None):
         ):
             flags.append("needs_motion_check")
         previous_source = cues[-1]["selected_source_id"] if cues else None
-        selected = _pick(ranked, config, previous_source, used_sources, providers)
+        from bin_finder.footage.youtube_usage import violations
+        selectable = [row for row in ranked if not row.get("youtube") or not violations(row["youtube"], usage_context(row["youtube"], historical, selected_youtube), previous_youtube)]
+        selected = _pick(selectable, config, previous_source, used_sources, providers)
+        previous_youtube = selected.get("youtube") if selected else None
+        if previous_youtube:
+            selected_youtube.append(previous_youtube)
         if selected:
             if selected["source_id"] in used_sources:
                 flags.extend(["source_reuse_fallback", "overlap_not_verified"])

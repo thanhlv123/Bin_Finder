@@ -18,7 +18,8 @@ Chạy được headless bằng một lệnh `bin_finder run`. **1.0 đạt khi 
 | R3 — Chấm khớp + AI tự chọn + màn hình duyệt (xong (#44)) | Embedding lọc nhanh, VLM xác nhận top 3; chọn tay hoặc AI tự chọn, thay/khóa lựa chọn. | Đánh giá footage thật có nhãn người duyệt; giữ source rotation, anti-adjacent reuse, anti-overlap và báo ca không chắc. |
 | R4 — Sản xuất video (xong (#45)) | TTS, dựng theo mốc thời gian giọng, hiệu ứng, nhạc, phụ đề. | Video xem được với hình, tiếng, phụ đề đồng bộ theo voice thật. |
 | R5 — Tự kiểm tra + xuất (xong (#46)) | Kiểm tra chất lượng trước khi xuất MP4 + credits. | Phát hiện thiếu media, lỗi timing/âm thanh/phụ đề và quyền chưa rõ; MP4 phát được, credits truy vết nguồn. |
-| R6 — Headless `bin_finder run` (đang làm, PR chờ) | Nối toàn bộ pipeline qua một lệnh với cấu hình rõ ràng. | Một lệnh đi từ kịch bản đến MP4 + credits không cần GUI, báo lỗi và trạng thái đủ để kiểm tra. |
+| R6 — Headless `bin_finder run` (xong (#47)) | Nối toàn bộ pipeline qua một lệnh với cấu hình rõ ràng. | Một lệnh đi từ kịch bản đến MP4 + credits không cần GUI, báo lỗi và trạng thái đủ để kiểm tra. |
+| R6.5 — Footage YouTube (đang làm, PR chờ) | Opt-in YouTube reuse cho K1, storyboard VLM, clip 3–5 giây, biến đổi, usage và credits. | Offline tests pass; cần nghiệm thu YouTube/Ollama thật. |
 | R7 — Nghiệm thu 1.0 | Làm trọn một video thật để chủ dự án đánh giá. | Chủ dự án xem video cuối và chấm đạt 1.0. |
 
 ### Ngoài 1.0

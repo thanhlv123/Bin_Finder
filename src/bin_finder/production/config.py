@@ -1,9 +1,11 @@
 """Local production settings without provider credentials."""
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, field
 import json
 import math
 import os
 from pathlib import Path
+
+from .youtube_transform import YouTubeTransformConfig
 
 from bin_finder.verification.ollama_vlm import validate_loopback_url
 
@@ -42,9 +44,13 @@ class ProductionConfig:
     cache_dir: str = ".cache/production"
     ffmpeg: str = "ffmpeg"
     ffprobe: str = "ffprobe"
+    youtube_reuse: bool = False
+    youtube_transform: YouTubeTransformConfig = field(default_factory=YouTubeTransformConfig)
 
     def __post_init__(self) -> None:
         validate_loopback_url(self.tts_url)
+        if type(self.youtube_reuse) is not bool:
+            raise ValueError("Invalid youtube_reuse")
         for setting in fields(self):
             value = getattr(self, setting.name)
             if isinstance(value, float) and not math.isfinite(value):
@@ -74,6 +80,8 @@ class ProductionConfig:
             value = os.environ.get("BIN_FINDER_PROD_" + name.upper(), payload.get(name))
             if value is None:
                 continue
+            if name == "youtube_transform":
+                continue
             default = getattr(defaults, name)
             if type(default) is bool:
                 if str(value).lower() not in ("true", "false", "1", "0"):
@@ -85,4 +93,15 @@ class ProductionConfig:
                 value = str((project_root / value).resolve()) if value else None
             values[name] = value
         values.setdefault("cache_dir", str(project_root / defaults.cache_dir))
+        transform_values = dict(payload.get("youtube_transform") or {})
+        for setting in fields(YouTubeTransformConfig):
+            raw = os.environ.get("BIN_FINDER_PROD_YT_" + setting.name.upper())
+            if raw is not None:
+                if setting.name == "mirror":
+                    if raw.lower() not in ("true", "false", "1", "0"):
+                        raise ValueError("Invalid YouTube mirror")
+                    transform_values[setting.name] = raw.lower() in ("true", "1")
+                else:
+                    transform_values[setting.name] = float(raw)
+        values["youtube_transform"] = YouTubeTransformConfig(**transform_values)
         return cls(**values)

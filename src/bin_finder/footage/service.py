@@ -17,6 +17,8 @@ class FootagePlan:
     sources_used: list[str]
     cues: list[dict]
     candidates_per_source: dict[str, int]
+    youtube_reuse: bool = False
+    youtube_usage_path: str = ""
 
     def to_dict(self):
         return asdict(self)
@@ -40,8 +42,13 @@ def _matches(candidate, config):
             config.orientation == "square" and width == height)
 
 
-def search_footage(plan: BriefPlan, registry, config):
+def search_footage(plan: BriefPlan, registry, config, youtube_service=None):
     cache, cues, used, counts = {}, [], [], {}
+    if config.youtube_reuse and youtube_service is None:
+        from .youtube_clips import YouTubeClips
+        youtube_service = YouTubeClips(config)
+    if youtube_service is not None and hasattr(youtube_service, "reset_run"):
+        youtube_service.reset_run()
     briefs = {b.cue_id: b for b in plan.briefs}
     for cue in plan.cues:
         row = {"cue_id": cue.cue_id, "text": cue.text, "candidates": [], "errors": []}
@@ -50,6 +57,15 @@ def search_footage(plan: BriefPlan, registry, config):
         queries = brief.queries if brief else {}
         fallback = next((q for q in queries.values() if q), [])
         for source in config.enabled_sources():
+            if source == "youtube" and config.youtube_reuse:
+                candidates, warnings = youtube_service.search(cue, brief, queries.get(source) or fallback)
+                candidates = candidates[:config.youtube_max_candidates_per_cue]
+                row["candidates"].extend(candidates)
+                row["errors"].extend({"source": source, "error": warning} for warning in warnings)
+                counts[source] = counts.get(source, 0) + len(candidates)
+                if source not in used:
+                    used.append(source)
+                continue
             provider = registry.get(source)
             if provider is None or not provider.status().configured:
                 continue
@@ -86,4 +102,5 @@ def search_footage(plan: BriefPlan, registry, config):
         cues.append(row)
     digest = sha256(json.dumps(plan.to_dict(), sort_keys=True, ensure_ascii=False,
                                separators=(",", ":")).encode("utf-8")).hexdigest()
-    return FootagePlan("footage_plan_v1", digest, plan.script_sha256, used, cues, counts)
+    return FootagePlan("footage_plan_v1", digest, plan.script_sha256, used, cues, counts, config.youtube_reuse,
+                       str(youtube_service.usage_path) if youtube_service else "")

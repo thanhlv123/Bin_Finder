@@ -16,6 +16,8 @@ class LicenseInfo:
     attribution_required: bool
     usable_in_video: bool
     notes: str = ""
+    kind: str = ""
+    requires_transform: bool = False
 
 
 def license_for(candidate):
