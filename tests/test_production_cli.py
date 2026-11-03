@@ -65,3 +65,18 @@ def test_complete_cli_injected(tmp_path):
 def test_cli_decisions(tmp_path):
     command = [*arguments(tmp_path), "--dry-run", "--decisions", str(FIXTURES / "decisions.json"), "--limit-cues", "1"]
     assert main(command) == 0
+
+
+def test_manifest_render_options(tmp_path):
+    """Persist subtitle/music/hold choices for downstream QA."""
+    def renderer(timeline, narration, output, work_dir, config):
+        assert not config.subtitles
+        output.touch()
+
+    command = [*arguments(tmp_path), '--no-subtitles', '--music', str(tmp_path / 'music.wav')]
+    assert main(command, engine=FakeEngine(), media_loader=lambda *values: tmp_path / 'source.mp4',
+                media_probe=lambda *values: MediaInfo(6, 1920, 1080), renderer=renderer) == 0
+    payload = json.loads((tmp_path / 'production.json').read_text(encoding='utf-8'))
+    assert payload['subtitles'] is False
+    assert payload['music_path'] == str((tmp_path / 'music.wav').resolve())
+    assert payload['end_hold'] == 2

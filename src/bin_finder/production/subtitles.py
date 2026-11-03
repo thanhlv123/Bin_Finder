@@ -17,15 +17,7 @@ def escape_ass(text: str) -> str:
 
 def write_subtitles(words: list[dict], output: Path, width: int, height: int) -> None:
     """Highlight one word at a time inside compact caption groups."""
-    groups = []
-    current = []
-    for word in words:
-        if current and (len(current) >= 7 or len(" ".join(item["word"] for item in [*current, word])) > 40):
-            groups.append(current)
-            current = []
-        current.append(word)
-    if current:
-        groups.append(current)
+    groups = group_words(words)
     lines = ["[Script Info]", "ScriptType: v4.00+", f"PlayResX: {width}", f"PlayResY: {height}",
              "[V4+ Styles]",
              "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
@@ -39,3 +31,17 @@ def write_subtitles(words: list[dict], output: Path, width: int, height: int) ->
                             for position, item in enumerate(group))
             lines.append(f"Dialogue: 0,{ass_time(word['start'])},{ass_time(end)},Default,,0,0,0,,{text}")
     output.write_text("\n".join(lines) + "\n", encoding="utf-8-sig")
+
+
+def group_words(words: list[dict]) -> list[list[dict]]:
+    """Group captions using the production word and character limits."""
+    groups = []
+    current = []
+    for word in words:
+        if current and (len(current) >= 7 or len(" ".join(item["word"] for item in [*current, word])) > 40):
+            groups.append(current)
+            current = []
+        current.append(word)
+    if current:
+        groups.append(current)
+    return groups

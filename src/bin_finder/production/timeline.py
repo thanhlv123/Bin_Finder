@@ -76,6 +76,10 @@ class Timeline:
     timings: dict = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
 
+    subtitles: bool = True
+    music_path: str | None = None
+    end_hold: float = 0.0
+
     def to_dict(self) -> dict:
         return asdict(self)
 
