@@ -1,0 +1,401 @@
+{
+  "version": "footage_plan_v1",
+  "brief_sha256": "briefhash",
+  "script_sha256": "c3d7308ce437b130509af0b8e016c125803a20681c80d1b59daa2140908773db",
+  "sources_used": [
+    "pexels",
+    "pixabay",
+    "commons",
+    "coverr",
+    "youtube"
+  ],
+  "cues": [
+    {
+      "cue_id": "C0001",
+      "text": "A doctor reads a report.",
+      "candidates": [
+        {
+          "source_id": "pexels:1",
+          "provider": "pexels",
+          "title": "doctor reads report hospital",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": false
+        },
+        {
+          "source_id": "pixabay:2",
+          "provider": "pixabay",
+          "title": "doctor reads report hospital",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": false
+        },
+        {
+          "source_id": "commons:3",
+          "provider": "commons",
+          "title": "doctor hospital",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": false
+        },
+        {
+          "source_id": "coverr:4",
+          "provider": "coverr",
+          "title": "cartoon doctor reads report",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": false
+        },
+        {
+          "source_id": "youtube:5",
+          "provider": "youtube",
+          "title": "doctor reads report",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": true
+        }
+      ],
+      "errors": []
+    },
+    {
+      "cue_id": "C0002",
+      "text": "A doctor reads a report.",
+      "candidates": [
+        {
+          "source_id": "pexels:1",
+          "provider": "pexels",
+          "title": "doctor reads report hospital",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": false
+        },
+        {
+          "source_id": "pixabay:2",
+          "provider": "pixabay",
+          "title": "doctor reads report hospital",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": false
+        },
+        {
+          "source_id": "commons:3",
+          "provider": "commons",
+          "title": "doctor hospital",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": false
+        },
+        {
+          "source_id": "coverr:4",
+          "provider": "coverr",
+          "title": "cartoon doctor reads report",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": false
+        },
+        {
+          "source_id": "youtube:5",
+          "provider": "youtube",
+          "title": "doctor reads report",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": true
+        }
+      ],
+      "errors": []
+    },
+    {
+      "cue_id": "C0003",
+      "text": "A nurse walks outside.",
+      "candidates": [
+        {
+          "source_id": "pexels:1",
+          "provider": "pexels",
+          "title": "doctor reads report hospital",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": false
+        },
+        {
+          "source_id": "pixabay:2",
+          "provider": "pixabay",
+          "title": "doctor reads report hospital",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": false
+        },
+        {
+          "source_id": "commons:3",
+          "provider": "commons",
+          "title": "doctor hospital",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": false
+        },
+        {
+          "source_id": "coverr:4",
+          "provider": "coverr",
+          "title": "cartoon doctor reads report",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": false
+        },
+        {
+          "source_id": "youtube:5",
+          "provider": "youtube",
+          "title": "doctor reads report",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": true
+        }
+      ],
+      "errors": []
+    },
+    {
+      "cue_id": "C0004",
+      "text": "Nothing can be seen.",
+      "candidates": [],
+      "errors": []
+    },
+    {
+      "cue_id": "C0005",
+      "text": "A forest grows.",
+      "candidates": [
+        {
+          "source_id": "youtube:5",
+          "provider": "youtube",
+          "title": "doctor reads report",
+          "description": "",
+          "source_metadata": {
+            "tags": [
+              "doctor",
+              "hospital"
+            ]
+          },
+          "duration": 10,
+          "resolution": "1920x1080",
+          "thumbnail_url": "https://images.pexels.com/a.jpg",
+          "preview_url": "https://videos.pexels.com/a.mp4",
+          "source_url": "https://example.test/video",
+          "license": {
+            "license_name": "Stock",
+            "usable_in_video": true
+          },
+          "reference_only": true
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "candidates_per_source": {}
+}

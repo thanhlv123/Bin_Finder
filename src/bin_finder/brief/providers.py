@@ -198,8 +198,24 @@ class OllamaBriefProvider:
                         raise ValueError("cue count")
                     brief = self.validate(matches[0], cue)
                 except (ValueError, KeyError, TypeError):
-                    original = fallback[start+offset]
-                    brief = replace(original, notes=original.notes + " Fallback: " + failure + ".")
+                    brief = None
+                    if self.config.retry_single and not connection_failed:
+                        retry_messages = [messages[0], {"role": "user", "content": json.dumps({
+                            "requested": [cue.to_dict()], "context": [c.to_dict() for c in neighbors],
+                            "style_hint": self.config.style_hint})}]
+                        try:
+                            retry_rows = json.loads(self.request(retry_messages, schema))["briefs"]
+                            if not isinstance(retry_rows, list):
+                                raise ValueError("invalid retry envelope")
+                            retry_matches = [r for r in retry_rows if isinstance(r, dict) and r.get("cue_id") == cue.cue_id]
+                            if len(retry_matches) != 1:
+                                raise ValueError("retry cue count")
+                            brief = self.validate(retry_matches[0], cue)
+                        except Exception as error:
+                            connection_failed = connection_failed or isinstance(error, (OSError, TimeoutError))
+                    if brief is None:
+                        original = fallback[start+offset]
+                        brief = replace(original, notes=original.notes + " Fallback: " + failure + ".")
                 result.append(brief)
         return result
 

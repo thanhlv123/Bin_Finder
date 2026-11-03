@@ -14,5 +14,6 @@
     "youtube",
     "storyblocks"
   ],
-  "style_hint": ""
+  "style_hint": "",
+  "retry_single": true
 }

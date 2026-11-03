@@ -1,0 +1,19 @@
+{
+  "top_k": 10,
+  "vlm_top_n": 3,
+  "vlm_enabled": true,
+  "auto_select_threshold": 0.6,
+  "min_text_score": 0.15,
+  "min_vlm_score": 0.7,
+  "source_cooldown": 2,
+  "no_adjacent_reuse": true,
+  "thumbnail_max_bytes": 2000000,
+  "thumbnail_hosts": [
+    "images.pexels.com",
+    "cdn.pixabay.com",
+    "pixabay.com",
+    "upload.wikimedia.org",
+    "cdn.coverr.co"
+  ],
+  "timeout_sec": 30.0
+}

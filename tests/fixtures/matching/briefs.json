@@ -1,0 +1,255 @@
+{
+  "cues": [
+    {
+      "cue_id": "C0001",
+      "chapter": "",
+      "text": "A doctor reads a report.",
+      "word_count": 5,
+      "est_duration_sec": 3.5
+    },
+    {
+      "cue_id": "C0002",
+      "chapter": "",
+      "text": "A doctor reads a report.",
+      "word_count": 5,
+      "est_duration_sec": 3.5
+    },
+    {
+      "cue_id": "C0003",
+      "chapter": "",
+      "text": "A nurse walks outside.",
+      "word_count": 4,
+      "est_duration_sec": 3.5
+    },
+    {
+      "cue_id": "C0004",
+      "chapter": "",
+      "text": "Nothing can be seen.",
+      "word_count": 4,
+      "est_duration_sec": 3.5
+    },
+    {
+      "cue_id": "C0005",
+      "chapter": "",
+      "text": "A forest grows.",
+      "word_count": 3,
+      "est_duration_sec": 3.5
+    }
+  ],
+  "briefs": [
+    {
+      "cue_id": "C0001",
+      "subject": "doctor",
+      "action": "reads report",
+      "setting": "hospital",
+      "shot_type": "medium",
+      "camera_motion": "static",
+      "mood": "neutral",
+      "must_show": [
+        "doctor reads report"
+      ],
+      "avoid": [
+        "cartoon"
+      ],
+      "queries": {
+        "pexels": [
+          "doctor reads report",
+          "doctor detail"
+        ],
+        "pixabay": [
+          "doctor reads report",
+          "doctor detail"
+        ],
+        "commons": [
+          "doctor reads report"
+        ],
+        "coverr": [
+          "doctor reads report",
+          "doctor detail"
+        ],
+        "youtube": [
+          "doctor reads report b-roll",
+          "doctor detail b-roll"
+        ],
+        "storyblocks": [
+          "doctor reads report",
+          "doctor detail"
+        ]
+      },
+      "origin": "heuristic",
+      "notes": "Lexical illustration only; review narration alignment, negation and abstract claims."
+    },
+    {
+      "cue_id": "C0002",
+      "subject": "doctor",
+      "action": "reads report",
+      "setting": "hospital",
+      "shot_type": "medium",
+      "camera_motion": "static",
+      "mood": "neutral",
+      "must_show": [
+        "doctor reads report"
+      ],
+      "avoid": [
+        "cartoon"
+      ],
+      "queries": {
+        "pexels": [
+          "doctor reads report",
+          "doctor detail"
+        ],
+        "pixabay": [
+          "doctor reads report",
+          "doctor detail"
+        ],
+        "commons": [
+          "doctor reads report"
+        ],
+        "coverr": [
+          "doctor reads report",
+          "doctor detail"
+        ],
+        "youtube": [
+          "doctor reads report b-roll",
+          "doctor detail b-roll"
+        ],
+        "storyblocks": [
+          "doctor reads report",
+          "doctor detail"
+        ]
+      },
+      "origin": "heuristic",
+      "notes": "Lexical illustration only; review narration alignment, negation and abstract claims."
+    },
+    {
+      "cue_id": "C0003",
+      "subject": "doctor",
+      "action": "reads report",
+      "setting": "hospital",
+      "shot_type": "medium",
+      "camera_motion": "static",
+      "mood": "neutral",
+      "must_show": [
+        "doctor reads report"
+      ],
+      "avoid": [
+        "cartoon"
+      ],
+      "queries": {
+        "pexels": [
+          "nurse walks",
+          "nurse doctor"
+        ],
+        "pixabay": [
+          "nurse walks",
+          "nurse doctor"
+        ],
+        "commons": [
+          "nurse walks"
+        ],
+        "coverr": [
+          "nurse walks",
+          "nurse doctor"
+        ],
+        "youtube": [
+          "nurse walks b-roll",
+          "nurse doctor b-roll"
+        ],
+        "storyblocks": [
+          "nurse walks",
+          "nurse doctor"
+        ]
+      },
+      "origin": "heuristic",
+      "notes": "Lexical illustration only; review narration alignment, negation and abstract claims."
+    },
+    {
+      "cue_id": "C0004",
+      "subject": "doctor",
+      "action": "reads report",
+      "setting": "hospital",
+      "shot_type": "medium",
+      "camera_motion": "static",
+      "mood": "neutral",
+      "must_show": [
+        "doctor reads report"
+      ],
+      "avoid": [
+        "cartoon"
+      ],
+      "queries": {
+        "pexels": [
+          "nothing seen",
+          "nothing seen nurse"
+        ],
+        "pixabay": [
+          "nothing seen",
+          "nothing seen nurse"
+        ],
+        "commons": [
+          "nothing seen"
+        ],
+        "coverr": [
+          "nothing seen",
+          "nothing seen nurse"
+        ],
+        "youtube": [
+          "nothing seen b-roll",
+          "nothing seen nurse b-roll"
+        ],
+        "storyblocks": [
+          "nothing seen",
+          "nothing seen nurse"
+        ]
+      },
+      "origin": "heuristic",
+      "notes": "Lexical illustration only; review narration alignment, negation and abstract claims. No affirmative observable action identified; suitable footage uncertain."
+    },
+    {
+      "cue_id": "C0005",
+      "subject": "doctor",
+      "action": "reads report",
+      "setting": "hospital",
+      "shot_type": "medium",
+      "camera_motion": "static",
+      "mood": "neutral",
+      "must_show": [
+        "doctor reads report"
+      ],
+      "avoid": [
+        "cartoon"
+      ],
+      "queries": {
+        "pexels": [
+          "forest grows",
+          "forest detail"
+        ],
+        "pixabay": [
+          "forest grows",
+          "forest detail"
+        ],
+        "commons": [
+          "forest grows"
+        ],
+        "coverr": [
+          "forest grows",
+          "forest detail"
+        ],
+        "youtube": [
+          "forest grows b-roll",
+          "forest detail b-roll"
+        ],
+        "storyblocks": [
+          "forest grows",
+          "forest detail"
+        ]
+      },
+      "origin": "heuristic",
+      "notes": "Lexical illustration only; review narration alignment, negation and abstract claims. No affirmative observable action identified; suitable footage uncertain."
+    }
+  ],
+  "provider_used": "heuristic",
+  "fallback_count": 0,
+  "script_sha256": "c3d7308ce437b130509af0b8e016c125803a20681c80d1b59daa2140908773db",
+  "version": "brief_plan_v1"
+}

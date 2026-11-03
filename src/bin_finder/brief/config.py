@@ -16,10 +16,13 @@ class BriefConfig:
     api_key: str = field(default="", repr=False)
     timeout_sec: float = 60.0
     batch_size: int = 6
+    retry_single: bool = True
     sources: list[str] = field(default_factory=lambda: ["pexels", "pixabay", "commons", "coverr", "youtube", "storyblocks"])
     style_hint: str = ""
 
     def __post_init__(self):
+        if type(self.retry_single) is not bool:
+            raise ValueError("retry_single must be boolean")
         if self.provider not in {"auto", "heuristic", "ollama", "openai_compatible"}:
             raise ValueError("invalid planning provider")
         if not math.isfinite(self.timeout_sec) or self.timeout_sec <= 0 or self.batch_size < 1:
@@ -37,6 +40,10 @@ class BriefConfig:
             if value is not None:
                 if f.name == "sources" and isinstance(value, str):
                     value = json.loads(value) if value.lstrip().startswith("[") else [s.strip() for s in value.split(",") if s.strip()]
+                if f.name == "retry_single" and isinstance(value, str):
+                    if value.lower() not in {"true", "false", "1", "0"}:
+                        raise ValueError("invalid retry_single")
+                    value = value.lower() in {"true", "1"}
                 if f.name == "batch_size":
                     value = int(value)
                 if f.name == "timeout_sec":
