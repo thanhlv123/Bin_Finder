@@ -9,6 +9,8 @@ from bin_finder.production.subtitles import group_words
 from bin_finder.production.timeline import Timeline
 from .models import Finding
 
+EXPORT_FIXABLE_CODES: frozenset[str] = frozenset({"loudness", "true_peak"})
+
 
 def check_streams(metadata: dict, config: ProductionConfig) -> list[Finding]:
     """Validate required streams and delivery format."""
