@@ -18,10 +18,11 @@ from bin_finder.verification.frame_sampler import (
 from bin_finder.verification.models import VerificationDimensions, VerificationResult
 
 DEFAULT_URL = "http://127.0.0.1:11434"
-DEFAULT_MODEL = "qwen3-vl:4b"
+DEFAULT_VLM_MODEL = "qwen3-vl:4b-instruct"
+DEFAULT_MODEL = DEFAULT_VLM_MODEL
 LOOPBACK_HOSTS = frozenset({"127.0.0.1", "localhost", "::1"})
 DEFAULT_NUM_CTX = 8192
-DEFAULT_NUM_PREDICT = 2048
+DEFAULT_NUM_PREDICT = 512
 NUM_CTX_RANGE = (2048, 32768)
 NUM_PREDICT_RANGE = (128, 8192)
 MAX_RESPONSE_BYTES = 1_048_576
@@ -220,7 +221,7 @@ class OllamaVisionVerifier:
 
     def _chat(self, scene, unit, frames) -> str:
         payload = {
-            "model": self.config.model, "stream": False, "format": "json",
+            "model": self.config.model, "stream": False, "format": "json", "think": False,
             "options": {"temperature": 0, "seed": 0, "num_ctx": self.config.num_ctx,
                         "num_predict": self.config.num_predict},
             "messages": [{

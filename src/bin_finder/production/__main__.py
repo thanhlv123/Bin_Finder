@@ -13,10 +13,10 @@ from bin_finder.matching.models import SelectionPlan
 from . import MissingSelectionError, ProductionError
 from .config import ProductionConfig
 from .credits import write_credits
-from .media import acquire_media, plan_clip, probe_media
+from .media import MediaInfo, acquire_media, plan_clip, probe_media
 from .narration import build_narration
 from .render import render_video, transition_durations
-from .timeline import build_timeline, resolve_selections
+from .timeline import Shot, build_timeline, clean_url, resolve_selections
 from .tts import SpeechEngine, VoiceStudioEngine
 
 
@@ -54,6 +54,62 @@ def main(argv: list[str] | None = None, *, engine: SpeechEngine | None = None,
         message = str(error) if isinstance(error, ProductionError) else "Invalid production input or configuration"
         print(message, file=sys.stderr)
         return 1
+
+
+
+def choose_available_media(shot: Shot, entry: dict, footage: FootagePlan,
+                           config: ProductionConfig, paths: dict, positions: dict,
+                           media_loader: Callable, media_probe: Callable,
+                           previous_youtube: list[dict]) -> tuple[dict, MediaInfo]:
+    """Try eligible ranked sources before allowing an exhausted source to restart."""
+    candidate = entry["candidate"]
+    path, info = load_source(candidate, config, paths, media_loader, media_probe)
+    source_key = (candidate["provider"], candidate["source_id"])
+    used_until = positions.get(source_key, 0)
+    if used_until > 0 and info.duration - used_until < 1:
+        from .youtube_selection import _acceptable
+        from bin_finder.footage.youtube_usage import read_usage
+        historical = read_usage(Path(footage.youtube_usage_path)) if footage.youtube_usage_path else []
+        candidates = next(row["candidates"] for row in footage.cues if row["cue_id"] == shot.cue_id)
+        for ranked in entry["cue"].get("ranked", []):
+            alternative = next((item for item in candidates if item["source_id"] == ranked["source_id"]), None)
+            if alternative is None or alternative is candidate:
+                continue
+            if alternative.get("provider") == "youtube" and not config.youtube_reuse:
+                continue
+            previous = previous_youtube[-1] if previous_youtube else None
+            if not _acceptable(alternative, shot.cue_id, historical, previous_youtube, previous,
+                               config.youtube_transform):
+                continue
+            alternative_path, alternative_info = load_source(alternative, config, paths, media_loader, media_probe)
+            alternative_key = (alternative["provider"], alternative["source_id"])
+            if alternative_info.duration - positions.get(alternative_key, 0) < 1:
+                continue
+            candidate, path, info = alternative, alternative_path, alternative_info
+            shot.notes.append("Source exhausted; used next ranked candidate")
+            shot.origin = "suggested"
+            break
+    shot.provider = candidate["provider"]
+    shot.source_id = candidate["source_id"]
+    shot.local_path = str(path)
+    shot.youtube = dict(candidate.get("youtube") or {})
+    license_fields = ("provider", "source_id", "title", "creator", "creator_url", "source_url",
+                      "license_name", "license_url", "attribution_required", "usable_in_video", "kind", "requires_transform")
+    shot.license = {name: candidate["license"][name] for name in license_fields if name in candidate["license"]}
+    for name in ("source_url", "creator_url", "license_url"):
+        if name in shot.license:
+            shot.license[name] = clean_url(shot.license[name])
+    return candidate, info
+
+
+def load_source(candidate: dict, config: ProductionConfig, paths: dict,
+                media_loader: Callable, media_probe: Callable) -> tuple[Path, MediaInfo]:
+    """Share downloaded paths across cues while probing their actual duration."""
+    source_key = (candidate["provider"], candidate["source_id"])
+    if source_key not in paths:
+        paths[source_key] = Path(media_loader(candidate, config)).resolve()
+    path = paths[source_key]
+    return path, media_probe(path, config.ffprobe)
 
 
 def produce(arguments: argparse.Namespace, engine: SpeechEngine | None, media_loader: Callable,
@@ -106,19 +162,20 @@ def produce(arguments: argparse.Namespace, engine: SpeechEngine | None, media_lo
     source_positions = {}
     for index, (shot, entry) in enumerate(zip(timeline.shots, resolved)):
         print(f"Acquire clip {index + 1}/{len(resolved)}")
+        candidate, info = choose_available_media(
+            shot, entry, footage, config, paths, source_positions, media_loader, media_probe,
+            [previous.youtube for previous in timeline.shots[:index] if previous.provider == "youtube"],
+        )
         source_key = (shot.provider, shot.source_id)
-        if source_key not in paths:
-            paths[source_key] = Path(media_loader(entry["candidate"], config)).resolve()
-        shot.local_path = str(paths[source_key])
-        info = media_probe(paths[source_key], config.ffprobe)
         if shot.provider == "youtube":
             from .youtube_transform import transform_shot
             transform_shot(shot, work_dir / f"youtube_{index:05d}.mp4", config, info.width, info.height)
         duration = shot.end - (shot.start if index else 0) + transitions[index]
-        plan_clip(shot, entry["candidate"], info, duration, source_positions.get(source_key, 0))
+        plan_clip(shot, candidate, info, duration, source_positions.get(source_key, 0))
         source_positions[source_key] = shot.clip_out
         if index and timeline.shots[index - 1].source_id == shot.source_id:
-            shot.notes.append("Explicit adjacent source reuse retained; source ranges do not overlap")
+            if "Source reused from start" not in shot.notes:
+                shot.notes.append("Explicit adjacent source reuse retained; source ranges do not overlap")
     media_seconds = perf_counter() - started
     started = perf_counter()
     renderer(timeline, narration_path, output, work_dir, config)

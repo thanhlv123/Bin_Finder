@@ -202,11 +202,11 @@ AI_Video_Editor consumer integration is not implemented. See
 [F020 details](docs/F020_PORTABLE_HANDOFF_GUI.md).
 
 F021 real VLM verification: the production workflow now verifies actual video frames with
-an optional local Ollama vision model (default `qwen3-vl:4b`, loopback only, stdlib HTTP, FFmpeg
+an optional local Ollama vision model (default `qwen3-vl:4b-instruct`, loopback only, stdlib HTTP, FFmpeg
 frame sampling), per-unit falling back to the heuristic verifier when Ollama, the model, FFmpeg
 or the response is unavailable. F005 remains the provider contract, F018 the text fallback, and
 F014 human approval is still required. No cloud upload, no model auto-install, no new dependency.
-The live pipeline smoke passed against local `qwen3-vl:4b`; accuracy on real footage has not been validated. The default `qwen3-vl:4b` is a Thinking model, so requests use `num_ctx` 8192 and `num_predict` 2048 (overridable via `BIN_FINDER_VLM_NUM_CTX` / `BIN_FINDER_VLM_NUM_PREDICT`). See [F021 details](docs/F021_REAL_VLM_VERIFICATION.md).
+Matching, brief planning and YouTube frame checks share `qwen3-vl:4b-instruct` by default with `think: false`. Matching uses `num_ctx` 8192 and `num_predict` 512; `BIN_FINDER_VLM_MODEL`, `BIN_FINDER_VLM_NUM_CTX` and `BIN_FINDER_VLM_NUM_PREDICT` still override matching settings. Thinking-model parsing remains supported for explicit overrides. Historical smoke results are in [F021 details](docs/F021_REAL_VLM_VERIFICATION.md).
 
 See the [v2 roadmap](docs/ROADMAP.md) for the milestone plan.
 
@@ -249,7 +249,7 @@ Luồng duyệt: footage → matching → mở `review.html` → chọn/khóa/b�
 Trang HTML chứa CSS/JS, preview phát trực tiếp từ URL HTTPS của nhà cung cấp. Các nút chỉ thay đổi quyết định trong trình duyệt cho tới khi tải JSON.
 
 Cấu hình: sao chép `config/matching.example.json` thành `config/matching.local.json`; biến `BIN_FINDER_MATCH_*` ghi đè từng trường (boolean: `true`/`false`; hosts: JSON hoặc phân cách dấu phẩy).
-VLM bật mặc định, dùng cấu hình F021: `BIN_FINDER_OLLAMA_URL`, `BIN_FINDER_VLM_MODEL` (mặc định `qwen3-vl:4b`), cùng các biến timeout/context F021. Không đọc planning.local.json. `--no-vlm` chạy hoàn toàn offline.
+VLM bật mặc định, dùng cấu hình F021: `BIN_FINDER_OLLAMA_URL`, `BIN_FINDER_VLM_MODEL` (mặc định `qwen3-vl:4b-instruct`), cùng các biến timeout/context F021. Không đọc planning.local.json. `--no-vlm` chạy hoàn toàn offline.
 Tầng 1 hiện là lexical: 0.35 BM25 + 0.25 must-show phrase + 0.35 action + chất lượng tối đa 0.05 − 0.15 mỗi token avoid; giới hạn 0.39 nếu thiếu động từ hành động. Điểm cuối có VLM là 0.4 text + 0.6 VLM, thiếu VLM dùng text và cờ `vlm_missing`.
 Thumbnail không chứng minh chuyển động; kết quả uncertain cần duyệt. YouTube chỉ tham khảo. Selection không cấp quyền tải/dựng; nếu phải dùng lại nguồn thì đánh dấu overlap chưa kiểm chứng. Khóa được áp lại từ decisions khi ID vẫn nằm trong Top K; ID ngoài Top K được cảnh báo, không tự thay thế.
 R1 có `retry_single` mặc định bật: mỗi cue LLM lỗi được thử riêng một lần; lỗi kết nối dừng gọi tiếp.
@@ -363,7 +363,7 @@ python -m bin_finder.production selection.json --footage output/k1/footage.json 
 ```
 
 Install `yt-dlp` and FFmpeg on PATH and run the existing Ollama vision model
-(`qwen3-vl:4b`, configured by the existing VLM settings). No YouTube API key or new Python
+(`qwen3-vl:4b-instruct`, configured by the existing VLM settings). No YouTube API key or new Python
 package is required. `footage.local.json` also accepts `yt_dlp`, `ffmpeg`, `cache_dir`,
 `usage_dir`, `videos_per_cue` (6), `frames_per_video` (8), `window_seconds` (8),
 `max_workers` (4), and `cc_only` (false); each has a `BIN_FINDER_FOOTAGE_` environment override.
@@ -395,3 +395,5 @@ Reusing others' YouTube content carries copyright and reused-content policy risk
 transformations do not grant rights. The switch is off by default.
 
 YouTube reuse reserves a separate `youtube_max_candidates_per_cue` quota (default 3) in `config/footage.local.json`, overridden by `BIN_FINDER_FOOTAGE_YOUTUBE_MAX_CANDIDATES_PER_CUE`; stock retains its own `max_candidates_per_cue` quota. Matching uses verified storyboard scores for YouTube and adds `youtube_preference` (default 0.1, clamped to [0,1]) from `config/matching.local.json` or `BIN_FINDER_MATCH_YOUTUBE_PREFERENCE` only for matching, non-reference clips when reuse is enabled. Reuse restrictions still apply. `--resume --from-step footage` reuses validated earlier artifacts and reruns footage and every subsequent step.
+
+R6h: YouTube retries malformed frame JSON once and reports the invalid-response count; only three consecutive connection/timeout failures disable YouTube for the run. Media downloads retry network failures after 2 and 5 seconds within the original deadline. Exhausted sources try eligible candidates in `selection.json` ranked order; if none remain, the source restarts with a manifest note. Credits record the source actually used.

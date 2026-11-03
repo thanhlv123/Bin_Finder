@@ -41,23 +41,32 @@ class YouTubeClips:
         self.consecutive_errors = 0
         self.disabled_error = ""
         self.inspected_frames = 0
+        self.invalid_responses = 0
 
     def _inspect(self, brief: object, cue_text: str, image: bytes, thumbnail: bool = True) -> dict:
         """Count all VLM calls, including acquisition checks."""
-        self.inspected_frames += 1
-        try:
-            verdict = self.judge.inspect(brief, cue_text, image, thumbnail=thumbnail)
-        except (VlmUnavailable, VlmResponseError) as error:
-            self.consecutive_errors += 1
-            if self.consecutive_errors >= 3:
-                self.disabled_error = (
-                    f"YouTube VLM lỗi liên tiếp ({type(error).__name__}), "
-                    f"kiểm tra Ollama và model {self.config.youtube_vlm_model}"
-                )
-                logging.getLogger(__name__).error(self.disabled_error)
-            raise
-        self.consecutive_errors = 0
-        return verdict
+        for attempt in range(2):
+            self.inspected_frames += 1
+            try:
+                verdict = self.judge.inspect(brief, cue_text, image, thumbnail=thumbnail)
+            except VlmResponseError:
+                self.invalid_responses += 1
+                self.consecutive_errors = 0
+                if attempt == 0:
+                    continue
+                raise
+            except VlmUnavailable as error:
+                self.consecutive_errors += 1
+                if self.consecutive_errors >= 3:
+                    self.disabled_error = (
+                        f"YouTube VLM unavailable ({type(error).__name__}); "
+                        f"check Ollama and model {self.config.youtube_vlm_model}"
+                    )
+                    logging.getLogger(__name__).error(self.disabled_error)
+                raise
+            self.consecutive_errors = 0
+            return verdict
+        raise VlmResponseError("invalid-youtube-frame")
 
     def _run(self, arguments: list[str]) -> bytes:
         """Run a bounded process without retaining external diagnostics."""
@@ -230,12 +239,15 @@ class YouTubeClips:
     def search(self, cue: object, brief: object, queries: list[str]) -> tuple[list[dict], list[str]]:
         """Report one progress line even when the YouTube circuit is open."""
         self.inspected_frames = 0
+        self.invalid_responses = 0
         self.searched_videos = 0
         candidates = []
         try:
             if self.disabled_error:
                 return [], [self.disabled_error]
             candidates, warnings = self._search(cue, brief, queries)
+            if self.invalid_responses:
+                warnings.append(f"YouTube VLM: {self.invalid_responses} invalid responses (VlmResponseError)")
             return candidates, warnings
         finally:
             print(

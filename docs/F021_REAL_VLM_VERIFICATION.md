@@ -37,7 +37,7 @@ RetrievalUnit -> bounded FFmpeg frame sampling -> local Ollama /api/chat (images
   linked sources, missing FFmpeg, timeouts and bad output raise `FrameSamplingError`.
 - `ollama_vlm.py` — `OllamaVisionVerifier` (stdlib `urllib`; no new dependency).
   `POST <base>/api/chat`, `stream=false`, `format=json`, temperature 0, seed 0,
-  `num_ctx` 8192, `num_predict` 2048 (see "Thinking model and token budget"), base64 frames
+  `num_ctx` 8192, `num_predict` 512, `think: false` (see "Thinking model and token budget"), base64 frames
   only (never the video, a path or transcript/metadata). Loopback only
   (`127.0.0.1`, `localhost`, `::1`; plain `http`, no credentials/path/query); no system proxy;
   redirects refused; response capped at 1 MiB; no Authorization header, no API key.
@@ -65,12 +65,12 @@ for the rest of that `verify()` call so the GUI worker does not wait through eve
 | Variable | Default |
 |---|---|
 | `BIN_FINDER_VLM_MODE` | `auto` (`auto` / `heuristic` / `off`) |
-| `BIN_FINDER_VLM_MODEL` | `qwen3-vl:4b` |
+| `BIN_FINDER_VLM_MODEL` | `qwen3-vl:4b-instruct` |
 | `BIN_FINDER_OLLAMA_URL` | `http://127.0.0.1:11434` (loopback only) |
 | `BIN_FINDER_VLM_TIMEOUT_SECONDS` | `120` (1–600) |
 | `BIN_FINDER_VLM_FRAMES_PER_UNIT` | `3` (1–6) |
 | `BIN_FINDER_VLM_NUM_CTX` | `8192` (2048–32768) |
-| `BIN_FINDER_VLM_NUM_PREDICT` | `2048` (128–8192, and below `NUM_CTX`) |
+| `BIN_FINDER_VLM_NUM_PREDICT` | `512` (128–8192, and below `NUM_CTX`) |
 
 `auto`: Ollama per unit with heuristic fallback. `heuristic`: never contacts Ollama.
 `off`: `production_verifier()` returns `None` (the historical behavior; F014 prepares with its
@@ -83,7 +83,7 @@ network or FFmpeg work; verification runs inside the existing `WorkflowWorker` t
 the Qt main thread. F014's `prepare()` fallback path for unconfigured/legacy callers is unchanged.
 
 ## Thinking model and token budget
-The default `qwen3-vl:4b` is a **Thinking** build: it writes reasoning before the JSON answer.
+The historical `qwen3-vl:4b` is a **Thinking** build: it writes reasoning before the JSON answer.
 Three sampled frames cost about 3.3k prompt tokens, so on real footage a 4096-token window or a
 600-token output cap is exhausted while it is still thinking, the reply `content` is empty, the
 strict parser rejects it and the unit silently falls back to the heuristic verifier.
@@ -96,7 +96,7 @@ Real-footage measurements (one clip, `qwen3-vl:4b`, Ollama 0.40.8, 3 frames; not
 | 4096 (Ollama default) | 2048 | 3324 + 772 = 4096 | `length` | empty content, heuristic fallback |
 | 8192 | 2048 | 3324 + 1018 | `stop` | valid JSON, no fallback |
 
-Hence the defaults `num_ctx=8192` and `num_predict=2048`. A larger context window uses more
+R6h now shares `qwen3-vl:4b-instruct` across matching, briefs and YouTube, sends `think: false`, and defaults to `num_ctx=8192` and `num_predict=512`. The table above records historical Thinking-model measurements; explicit model and token-budget overrides remain supported. A larger context window uses more
 RAM/VRAM and slows the first load; lower the frame count or choose a non-thinking vision model
 if that is a problem. Both values are validated and bounded (above); an invalid value degrades
 to the heuristic verifier without contacting Ollama. Thinking text is never stored or logged.
@@ -110,7 +110,7 @@ A VLM score never approves anything. The path stays VLM verifies/reranks → F00
 Loopback HTTP only; only up to 6 downscaled JPEG frames per unit leave the process (to the local
 Ollama); no full video, no remote upload, no persistent frame cache or files, no secrets.
 Ollama is optional: Bin Finder launches and works without it. Nothing downloads Ollama or pulls a
-model; install it and run `ollama pull qwen3-vl:4b` yourself if you want real visual verification.
+model; install it and run `ollama pull qwen3-vl:4b-instruct` yourself if you want real visual verification.
 
 ## Live smoke (explicit opt-in, never in pytest/CI)
 ```powershell
@@ -123,7 +123,7 @@ result prints `PASS_F021_REAL_VLM`; an absent Ollama or model exits nonzero with
 
 ## Limitations
 - Verification quality depends on the local model; the live smoke covered only a synthetic clip; accuracy on real footage is unmeasured.
-- The default model is a Thinking build and needs the larger token budget above; a long
+- Explicit Thinking-model overrides may need the larger token budget above; a long
   reasoning chain can still exceed `num_predict`, in which case the unit falls back to the
   heuristic. Only one real clip has been measured at the new defaults.
 - The heuristic fallback has no transcript for raw footage and scores such units at 0.0, so a

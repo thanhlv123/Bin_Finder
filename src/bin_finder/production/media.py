@@ -5,7 +5,8 @@ import json
 import math
 from pathlib import Path
 import subprocess
-from time import monotonic
+from time import monotonic, sleep
+from urllib.error import HTTPError
 from urllib.parse import urlsplit
 from urllib.request import ProxyHandler, Request, build_opener
 
@@ -124,18 +125,31 @@ def acquire_media(candidate: dict, config: ProductionConfig) -> Path:
     opener = build_opener(ProxyHandler({}), NoRedirect())
     try:
         deadline = monotonic() + 600
-        with opener.open(Request(link, headers={"User-Agent": "BinFinder/production"}), timeout=60) as response:
-            size = 0
-            digest_state = sha256()
-            with temporary.open("wb") as output:
-                while chunk := response.read(1024 * 1024):
-                    if monotonic() > deadline:
-                        raise ProductionError("Selected media download deadline exceeded")
-                    size += len(chunk)
-                    if size > MAX_MEDIA_BYTES:
-                        raise ProductionError("Selected media exceeds download size limit")
-                    digest_state.update(chunk)
-                    output.write(chunk)
+        for attempt in range(3):
+            try:
+                with opener.open(Request(link, headers={"User-Agent": "BinFinder/production"}), timeout=60) as response:
+                    size = 0
+                    digest_state = sha256()
+                    with temporary.open("wb") as output:
+                        while chunk := response.read(1024 * 1024):
+                            if monotonic() > deadline:
+                                raise ProductionError("Selected media download deadline exceeded")
+                            size += len(chunk)
+                            if size > MAX_MEDIA_BYTES:
+                                raise ProductionError("Selected media exceeds download size limit")
+                            digest_state.update(chunk)
+                            output.write(chunk)
+                break
+            except HTTPError:
+                raise
+            except OSError:
+                temporary.unlink(missing_ok=True)
+                if attempt == 2:
+                    raise
+                delay = (2, 5)[attempt]
+                if monotonic() + delay >= deadline:
+                    raise ProductionError("Selected media download deadline exceeded")
+                sleep(delay)
         probe_media(temporary, config.ffprobe)
         temporary.replace(destination)
         proof_path.write_text(json.dumps(dict(sha256=digest_state.hexdigest())), encoding="utf-8")
@@ -148,16 +162,21 @@ def acquire_media(candidate: dict, config: ProductionConfig) -> Path:
 
 def plan_clip(shot: Shot, candidate: dict, info: MediaInfo, duration: float,
               used_until: float = 0.0) -> None:
-    """Prefer an approved anchor or center trim; never overlap reused media."""
+    """Prefer non-overlapping ranges; restart only when the source is exhausted."""
     if not math.isfinite(duration) or duration <= 0:
         raise ProductionError(f"Invalid shot duration: {shot.cue_id}")
     available = info.duration - used_until
-    if available <= 0:
-        raise ProductionError(f"No non-overlapping source range for {shot.cue_id}")
+    reused_from_start = used_until > 0 and available < 1
+    if reused_from_start:
+        used_until = 0.0
+        available = info.duration
+        shot.notes.append("Source reused from start")
     shot.speed = max(0.8, min(1.0, available / duration))
     required = min(available, duration * shot.speed)
     anchor = candidate.get("proposed_start")
     preferred = float(anchor) if anchor is not None else (info.duration - required) / 2
+    if reused_from_start:
+        preferred = 0.0
     if not math.isfinite(preferred):
         raise ProductionError(f"Invalid source anchor: {shot.cue_id}")
     shot.clip_in = max(used_until, min(preferred, info.duration - required))
@@ -166,7 +185,7 @@ def plan_clip(shot: Shot, candidate: dict, info: MediaInfo, duration: float,
         shot.notes.append("Short source slowed to at least 0.8x")
     if required / shot.speed < duration - 0.001:
         shot.notes.append("Source exhausted after 0.8x slowdown; final frame extended with gentle zoom")
-    if anchor is None:
+    if anchor is None and not reused_from_start:
         shot.notes.append("Center trim heuristic; visual best segment not analyzed")
 
 

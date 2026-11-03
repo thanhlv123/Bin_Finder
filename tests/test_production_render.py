@@ -70,8 +70,8 @@ def test_short_clip_and_no_overlap():
     assert shot.speed == 0.8
     assert shot.clip_out == 2
     assert any("final frame" in note for note in shot.notes)
-    with pytest.raises(ProductionError, match="non-overlapping"):
-        plan_clip(shot, {}, MediaInfo(2, 1920, 1080), 5, used_until=2)
+    plan_clip(shot, {}, MediaInfo(2, 1920, 1080), 5, used_until=2)
+    assert "Source reused from start" in shot.notes
 
 
 @pytest.mark.parametrize("metadata", [

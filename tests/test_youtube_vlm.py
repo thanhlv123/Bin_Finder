@@ -69,7 +69,7 @@ def test_footage_model_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     assert service.judge.config.model == "custom-instruct"
 
 
-@pytest.mark.parametrize("failure", [VlmUnavailable, VlmResponseError])
+@pytest.mark.parametrize("failure", [VlmUnavailable])
 def test_fail_fast_preserves_other_sources(
     tmp_path: Path, capsys: pytest.CaptureFixture, caplog: pytest.LogCaptureFixture, failure: type,
 ) -> None:
@@ -105,7 +105,7 @@ def test_fail_fast_preserves_other_sources(
 
 
 def test_success_resets_consecutive_mixed_errors(tmp_path: Path) -> None:
-    outcomes = [VlmUnavailable(), VlmResponseError(), {}, VlmResponseError(), VlmUnavailable()]
+    outcomes = [VlmUnavailable(), VlmResponseError(), {}, VlmUnavailable()]
 
     class SequenceJudge:
         def inspect(self, brief: object, cue_text: str, image: bytes, thumbnail: bool = True) -> dict:
@@ -115,14 +115,15 @@ def test_success_resets_consecutive_mixed_errors(tmp_path: Path) -> None:
             return outcome
 
     service = YouTubeClips(FootageConfig(cache_dir=str(tmp_path)), judge=SequenceJudge())
-    for index in range(5):
-        if index == 2:
-            assert service._inspect({}, "", b"frame") == {}
-        else:
-            with pytest.raises((VlmUnavailable, VlmResponseError)):
-                service._inspect({}, "", b"frame")
-        assert not service.disabled_error
-    assert service.consecutive_errors == 2
+    with pytest.raises(VlmUnavailable):
+        service._inspect({}, "", b"frame")
+    assert service._inspect({}, "", b"frame") == {}
+    assert service.consecutive_errors == 0
+    assert service.invalid_responses == 1
+    with pytest.raises(VlmUnavailable):
+        service._inspect({}, "", b"frame")
+    assert service.consecutive_errors == 1
+    assert not service.disabled_error
     service.reset_run()
     assert service.consecutive_errors == 0
 
@@ -188,3 +189,35 @@ def test_scene_drift_absolute_floor_and_clip_mode(tmp_path: Path) -> None:
     cue = SimpleNamespace(text="forest", est_duration_sec=4)
     with pytest.raises(ValueError, match="scene_drift"):
         service._clip(cue, {}, {"id": "video", "duration": 120}, 60, {"score": 0.6, "regions": []})
+
+
+def test_invalid_json_does_not_disable_later_cues(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    class InvalidJudge:
+        calls = 0
+
+        def inspect(self, brief: object, cue_text: str, image: bytes, thumbnail: bool = True) -> dict:
+            self.calls += 1
+            raise VlmResponseError("private response")
+
+    judge = InvalidJudge()
+    service = YouTubeClips(FootageConfig(cache_dir=str(tmp_path)), judge=judge)
+    frame = tmp_path / "frame.jpg"
+    frame.write_bytes(b"frame")
+    searches = []
+    def search_ids(queries: list[str]) -> list[str]:
+        searches.append(queries)
+        return ["one", "two", "three"]
+    service._search_ids = search_ids
+    service._prepare = lambda identity: {
+        "info": {"id": identity, "title": "forest", "description": "forest"}, "frames": [(1, frame)],
+    }
+    for index in range(3):
+        candidates, warnings = service.search(SimpleNamespace(cue_id=str(index), text="forest"), {}, ["forest"])
+        assert not candidates
+        assert any("6 invalid responses" in warning for warning in warnings)
+        assert not service.disabled_error
+        assert "private response" not in str(warnings)
+    assert len(searches) == 3
+    assert judge.calls == 18

@@ -5,12 +5,14 @@ import json
 import math
 import os
 
+from bin_finder.verification.ollama_vlm import DEFAULT_VLM_MODEL
+
 
 @dataclass(frozen=True)
 class BriefConfig:
     provider: str = "auto"
     ollama_endpoint: str = "http://127.0.0.1:11434"
-    ollama_model: str = "qwen3-vl:4b-instruct"
+    ollama_model: str = DEFAULT_VLM_MODEL
     api_base_url: str = ""
     api_model: str = ""
     api_key: str = field(default="", repr=False)
