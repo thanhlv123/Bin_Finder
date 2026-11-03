@@ -39,6 +39,7 @@ from bin_finder.scene_planning import ScenePlanner, ScenePlanningError
 from bin_finder.gui.final_export_worker import FinalExportWorker
 from bin_finder.gui.session_lifecycle import SessionLifecycle
 from bin_finder.acceptance import evaluate_project, production_acceptance_policy
+from bin_finder.verification.factory import production_verifier
 from bin_finder.workflow import WorkflowRequest, WorkflowService
 from bin_finder.acquisition import AcquisitionRequest, AcquisitionService
 from bin_finder.gui.theme import APP_STYLE
@@ -463,8 +464,10 @@ class MainWindow(QMainWindow):
         self._clear_final_options()
         request = WorkflowRequest(tuple(self.scenes), (candidate,),
                                   self._review_store().decisions(), True)
+        # F021: construction only; any VLM/FFmpeg work happens inside the worker thread.
         worker = WorkflowWorker(WorkflowService(
-            project_id=self.project_panel.project_name.text()), request)
+            project_id=self.project_panel.project_name.text(),
+            verifier=production_verifier()), request)
         self._workflow_worker = worker
         self.workflow_button.setEnabled(False)
         self.acquire_button.setEnabled(False)

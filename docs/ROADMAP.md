@@ -51,8 +51,8 @@ Không mở hướng nghiên cứu ngoài lộ trình. Mỗi mốc một nhánh 
 
 ## Lịch sử F001–F021
 
-F001–F020: **đã merge, CI pass**. Các số liệu nghiệm thu bên dưới được giữ làm lịch sử.
-F021: **PR #29, chờ merge**.
+F001–F021: **đã merge, CI pass**. Các số liệu nghiệm thu bên dưới được giữ làm lịch sử.
+F021: merge qua PR #29 (2026-11-03); độ chính xác trên footage thật chưa kiểm chứng.
 
 The accepted F001.5 workspace layout remains fixed unless a real usability bug requires a change.
 
@@ -119,6 +119,11 @@ F020: Portable handoff GUI. **Merged, CI pass; local acceptance PASS**.
 Panel 7 exposes the F017 handoff (checked by default, independent of the legacy adapter);
 core `ExportOptions().handoff` stays opt-in. No schema or acceptance changes; consumer
 integration still not implemented. See [F020 contract](F020_PORTABLE_HANDOFF_GUI.md).
+
+F021: Real VLM verification. **Implemented; offline acceptance PASS, live Ollama pipeline smoke PASS
+(qwen3-vl:4b), real-footage accuracy not validated, Windows CI pending**. Local Ollama vision provider over bounded FFmpeg frames with strict parsing
+and per-unit heuristic fallback, wired into the production workflow. F005 contract and F014
+human approval unchanged. See [F021 contract](F021_REAL_VLM_VERIFICATION.md).
 
 ## Architecture principles learned from public footage-search projects
 

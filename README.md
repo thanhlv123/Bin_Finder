@@ -6,7 +6,7 @@ The 1.0 pipeline must also run headlessly with one `bin_finder run` command. Acc
 
 ## Current milestone status
 
-See the [v2 roadmap and milestone history](docs/ROADMAP.md) for R0-R7, completion criteria and retained research ideas. F001-F020 are merged with CI passing; F021 is PR #29, awaiting merge. R0 aligns documentation, version and CI with the new direction.
+See the [v2 roadmap and milestone history](docs/ROADMAP.md) for R0-R7, completion criteria and retained research ideas. F001-F021 are merged with CI passing (F021 real-footage accuracy not yet validated). R0 aligns documentation, version and CI with the new direction.
 
 Candidate approval for acquisition/analysis is separate from final clip approval.
 Only explicitly approved, verified local clip proposals create final selections
@@ -170,5 +170,12 @@ default, which makes a normal GUI export write `_bin_finder_handoff.json`
 `ai_video_editor_bin_finder_adapter_v1` option remains separate and independent.
 AI_Video_Editor consumer integration is not implemented. See
 [F020 details](docs/F020_PORTABLE_HANDOFF_GUI.md).
+
+F021 real VLM verification: the production workflow now verifies actual video frames with
+an optional local Ollama vision model (default `qwen3-vl:4b`, loopback only, stdlib HTTP, FFmpeg
+frame sampling), per-unit falling back to the heuristic verifier when Ollama, the model, FFmpeg
+or the response is unavailable. F005 remains the provider contract, F018 the text fallback, and
+F014 human approval is still required. No cloud upload, no model auto-install, no new dependency.
+The live pipeline smoke passed against local `qwen3-vl:4b`; accuracy on real footage has not been validated. The default `qwen3-vl:4b` is a Thinking model, so requests use `num_ctx` 8192 and `num_predict` 2048 (overridable via `BIN_FINDER_VLM_NUM_CTX` / `BIN_FINDER_VLM_NUM_PREDICT`). See [F021 details](docs/F021_REAL_VLM_VERIFICATION.md).
 
 See the [v2 roadmap](docs/ROADMAP.md) for the milestone plan.
