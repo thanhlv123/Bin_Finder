@@ -20,3 +20,6 @@ config/planning.local.json
 config/footage.local.json
 
 config/matching.local.json
+
+config/production.local.json
+.cache/production/

@@ -24,6 +24,36 @@ hashes remain in the F015 manifest. The current footage export does not yet rend
 
 The accepted GUI layout remains fixed. New retrieval capabilities are added behind the existing panels rather than redesigning the workspace.
 
+## Production (R4)
+
+The headless flow is `footage -> matching -> review/decisions -> production`.
+Open VoiceStudio locally and put FFmpeg/FFprobe on PATH (or configure executable paths).
+Copy `config/production.example.json` to the ignored `config/production.local.json`;
+settings can also be overridden with `BIN_FINDER_PROD_*` environment variables.
+Music and effect paths are optional and relative to the project root.
+
+```powershell
+python -m bin_finder.production selection.json --footage footage.json -o output/final.mp4 --decisions decisions.json --dry-run
+python -m bin_finder.production selection.json --footage footage.json -o output/final.mp4 --decisions decisions.json
+```
+
+Production stops before speech/downloads for unresolved or unusable footage.
+`--allow-suggested` explicitly permits eligible suggestions and marks them in credits
+and `production.json`. YouTube and reference-only footage remain ineligible.
+Use `--limit-cues 3` for a preview, `--music PATH`, `--no-subtitles`, `--no-icon`,
+`--work-dir DIR`, or `--project-root DIR` as needed. Outputs are the MP4,
+`credits.txt` and `production.json` in the output directory; intermediate clips and
+ASS captions stay in the work directory. Use separate output directories per project.
+
+Speech is cached before punctuation pauses; cue shots start at aligned first words.
+Short footage slows to 0.8x and then extends its final frame with gentle zoom.
+Reused sources get non-overlapping ranges or fail when exhausted. Explicit adjacent
+selections are retained with a timeline note. Center trimming is a heuristic rather
+than visual segment scoring. R2 Coverr/Commons metadata may retain only a preview;
+production uses that URL if no full-resolution renditions are available.
+Music uses sidechain compression (`duck_db` is nominal reduction, dependent on voice
+level). Optional light leaks mark TTS block changes; whoosh plays only at block changes, at least `whoosh_min_gap_sec` (default 20 seconds) apart.
+
 ## Current discovery sources
 
 - YouTube Data API v3 — discovery/metadata only
