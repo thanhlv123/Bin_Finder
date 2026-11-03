@@ -1,0 +1,18 @@
+{
+  "hits": [
+    {
+      "id": 22,
+      "tags": "forest",
+      "duration": 15,
+      "pageURL": "https://pixabay.com/videos/forest-22/",
+      "user": "Jane Doe",
+      "videos": {
+        "large": {
+          "width": 1920,
+          "height": 1080,
+          "url": "https://cdn.pixabay.com/forest.mp4"
+        }
+      }
+    }
+  ]
+}

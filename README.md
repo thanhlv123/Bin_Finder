@@ -191,3 +191,17 @@ Generate sentence-level cues, visual briefs and source-specific English footage 
 Copy `config/planning.example.json` to `config/planning.local.json` under `--project-root` (default: current directory). All settings accept `BIN_FINDER_PLANNING_<FIELD>` environment overrides; sources accept a JSON array or comma-separated names. For an OpenAI-compatible API, set `api_base_url` (including `/v1` if needed), `api_model`, and `BIN_FINDER_PLANNING_API_KEY`. Credentials are excluded from plan output and config repr.
 
 `auto` checks the configured Ollama model, then configured API, then offline heuristic. Failed or invalid LLM cues fall back individually, with reasons in `notes`. `fallback_count` counts heuristic cues when LLM/auto was requested (zero for explicit heuristic). JSON includes stable sequential cue IDs, original narration, SHA-256 of the full script and schema version `brief_plan_v1`. IDs are reproducible for the same script; inserting earlier narration can renumber later cues. A chapter containing fewer than three words remains a short cue to preserve its narration and chapter. Heuristic briefs need editorial review, especially abstract or negated statements; they do not verify footage or authorize acquisition.
+
+## Footage sources (R2)
+
+Run `python -m bin_finder.footage BRIEFS.json -o FOOTAGE.json --credits credits.txt`.
+Copy `config/footage.example.json` to the project's `config/footage.local.json`;
+select it with `--project-root PATH`. Provider credentials use the existing provider
+configuration; Coverr also accepts `BIN_FINDER_COVERR_API_KEY`. Commons needs no key.
+Settings accept `BIN_FINDER_FOOTAGE_*` overrides (sources are comma separated).
+Use `--sources pexels,coverr`, `--limit-cues N`, or `--youtube` / `--no-youtube`.
+YouTube is disabled by default, even when listed in sources; enabling it adds
+reference metadata only, never download or usage permission.
+The JSON carries per-candidate licenses, reference flags and per-cue errors for R3.
+`credits.txt` groups unique sources with creator and license links. Discovery license
+metadata does not replace acquisition authorization or final clip approval.

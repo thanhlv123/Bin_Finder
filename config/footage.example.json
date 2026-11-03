@@ -1,0 +1,15 @@
+{
+  "sources": [
+    "pexels",
+    "pixabay",
+    "commons",
+    "coverr"
+  ],
+  "youtube_enabled": false,
+  "per_query_limit": 8,
+  "max_candidates_per_cue": 30,
+  "min_width": 1280,
+  "min_height": 720,
+  "orientation": "landscape",
+  "exclude_unusable": true
+}

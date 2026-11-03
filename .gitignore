@@ -16,3 +16,5 @@ config/providers.local.json
 .claude/settings.local.json
 
 config/planning.local.json
+
+config/footage.local.json

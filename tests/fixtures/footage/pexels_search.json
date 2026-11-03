@@ -1,0 +1,25 @@
+{
+  "videos": [
+    {
+      "id": 11,
+      "url": "https://www.pexels.com/video/forest-11/",
+      "duration": 12,
+      "width": 1920,
+      "height": 1080,
+      "user": {
+        "id": 1,
+        "name": "Jane Doe",
+        "url": "https://www.pexels.com/@jane"
+      },
+      "video_files": [
+        {
+          "id": 2,
+          "width": 1920,
+          "height": 1080,
+          "file_type": "video/mp4",
+          "link": "https://videos.pexels.com/forest.mp4"
+        }
+      ]
+    }
+  ]
+}

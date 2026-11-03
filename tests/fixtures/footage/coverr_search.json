@@ -1,0 +1,27 @@
+{
+  "hits": [
+    {
+      "id": "forest-33",
+      "slug": "green-forest",
+      "title": "Forest",
+      "description": "Trees",
+      "duration": 10,
+      "author": {
+        "name": "Jane Doe"
+      },
+      "max_width": 1920,
+      "max_height": 1080,
+      "urls": {
+        "mp4": "https://cdn.coverr.co/forest.mp4"
+      }
+    },
+    {},
+    {
+      "id": "minimal",
+      "urls": null
+    }
+  ],
+  "page": 1,
+  "pages": 1,
+  "total": 2
+}
