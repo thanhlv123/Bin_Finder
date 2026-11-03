@@ -1,0 +1,90 @@
+{
+  "query": {
+    "pages": [
+      {
+        "pageid": 1,
+        "title": "File:Forest1.webm",
+        "imageinfo": [
+          {
+            "mime": "video/webm",
+            "width": 1920,
+            "height": 1080,
+            "duration": 12,
+            "url": "https://upload.wikimedia.org/forest1.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Forest1.webm",
+            "extmetadata": {
+              "Artist": {
+                "value": "<a href=\"/Jane\">Jane Doe</a>"
+              },
+              "LicenseShortName": {
+                "value": "CC BY-SA 4.0"
+              },
+              "LicenseUrl": {
+                "value": "https://creativecommons.org/licenses/by-sa/4.0/"
+              },
+              "AttributionRequired": {
+                "value": "true"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "pageid": 2,
+        "title": "File:Forest2.webm",
+        "imageinfo": [
+          {
+            "mime": "video/webm",
+            "width": 1920,
+            "height": 1080,
+            "duration": 12,
+            "url": "https://upload.wikimedia.org/forest2.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Forest2.webm",
+            "extmetadata": {
+              "Artist": {
+                "value": "<a href=\"/Jane\">Jane Doe</a>"
+              },
+              "LicenseShortName": {
+                "value": "CC BY-NC 4.0"
+              },
+              "LicenseUrl": {
+                "value": "https://creativecommons.org/licenses/by-sa/4.0/"
+              },
+              "AttributionRequired": {
+                "value": "true"
+              }
+            }
+          }
+        ]
+      },
+      {
+        "pageid": 3,
+        "title": "File:Forest3.webm",
+        "imageinfo": [
+          {
+            "mime": "image/jpeg",
+            "width": 1920,
+            "height": 1080,
+            "duration": 12,
+            "url": "https://upload.wikimedia.org/forest3.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+            "descriptionurl": "https://commons.wikimedia.org/wiki/File:Forest3.webm",
+            "extmetadata": {
+              "Artist": {
+                "value": "<a href=\"/Jane\">Jane Doe</a>"
+              },
+              "LicenseShortName": {
+                "value": "CC0"
+              },
+              "LicenseUrl": {
+                "value": "https://creativecommons.org/licenses/by-sa/4.0/"
+              },
+              "AttributionRequired": {
+                "value": "true"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

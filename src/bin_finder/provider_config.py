@@ -9,6 +9,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class ProviderConfig:
+    coverr_api_key: str = field(default="", repr=False)
     youtube_api_key: str = field(default="", repr=False)
     pexels_api_key: str = field(default="", repr=False)
     pixabay_api_key: str = field(default="", repr=False)
@@ -39,6 +40,7 @@ class ProviderConfig:
             return str(raw).strip() if raw is not None else ""
 
         return cls(
+            coverr_api_key=value("BIN_FINDER_COVERR_API_KEY", "coverr_api_key"),
             youtube_api_key=value("BIN_FINDER_YOUTUBE_API_KEY", "youtube_api_key"),
             pexels_api_key=value("BIN_FINDER_PEXELS_API_KEY", "pexels_api_key"),
             pixabay_api_key=value("BIN_FINDER_PIXABAY_API_KEY", "pixabay_api_key"),

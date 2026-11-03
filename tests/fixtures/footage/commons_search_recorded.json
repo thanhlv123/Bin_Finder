@@ -1,0 +1,391 @@
+{
+ "batchcomplete": true,
+ "continue": {
+  "gsroffset": 4,
+  "continue": "gsroffset||"
+ },
+ "query": {
+  "pages": [
+   {
+    "pageid": 54961833,
+    "ns": 6,
+    "title": "File:Kidney stones.webm",
+    "index": 3,
+    "imagerepository": "local",
+    "imageinfo": [
+     {
+      "timestamp": "2017-01-27T21:40:45Z",
+      "size": 39060157,
+      "width": 1920,
+      "height": 1080,
+      "duration": 444.967,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/0/0b/Kidney_stones.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Kidney_stones.webm",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=54961833",
+      "sha1": "b7f7de9880c56331c7cee82c37bb3ad1d3411565",
+      "extmetadata": {
+       "DateTime": {
+        "value": "2017-01-27 21:40:45",
+        "source": "mediawiki-metadata",
+        "hidden": ""
+       },
+       "ObjectName": {
+        "value": "Kidney stones",
+        "source": "mediawiki-metadata"
+       },
+       "CommonsMetadataExtension": {
+        "value": 1.2,
+        "source": "extension",
+        "hidden": ""
+       },
+       "Categories": {
+        "value": "Kidney stone disease|Videos from Osmosis",
+        "source": "commons-categories",
+        "hidden": ""
+       },
+       "Assessments": {
+        "value": "",
+        "source": "commons-categories",
+        "hidden": ""
+       },
+       "ImageDescription": {
+        "value": "What are kidney stones? Kidney stones form when certain particles in the urine precipitate out and crystallize. Calcium oxalate stones are most common, but there're also uric acid stones, struvite stones, and other less common stones.\n<p>Sources:\nPathophysiology (Copstead), 5th Ed.\nPathoma\n<a class=\"external free\" href=\"https://en.wikipedia.org/wiki/Hyperuricosuria\">https://en.wikipedia.org/wiki/Hyperuricosuria</a>\n<a rel=\"nofollow\" class=\"external free\" href=\"http://emedicine.medscape.com/article/437096-overview#a4\">http://emedicine.medscape.com/article/437096-overview#a4</a>\n<a rel=\"nofollow\" class=\"external free\" href=\"http://emedicine.medscape.com/article/983759-overview?pa=mHkSHsMAn4BUDmp1GR5wZUSCN%2BIU9l2uAlb5Gq0bCDJDTGblqxPef0hGC7ukEdbt1dOnZzCQ2omtM3%2BmeMtUTc5tQIqSBXMeLFS1IOzvhsM%3D#a5\">http://emedicine.medscape.com/article/983759-overview?pa=mHkSHsMAn4BUDmp1GR5wZUSCN%2BIU9l2uAlb5Gq0bCDJDTGblqxPef0hGC7ukEdbt1dOnZzCQ2omtM3%2BmeMtUTc5tQIqSBXMeLFS1IOzvhsM%3D#a5</a>\n<a rel=\"nofollow\" class=\"external free\" href=\"http://emedicine.medscape.com/article/439127-overview#a8\">http://emedicine.medscape.com/article/439127-overview#a8</a>\n<a rel=\"nofollow\" class=\"external free\" href=\"http://www.uptodate.com/contents/uric-acid-balance\">http://www.uptodate.com/contents/uric-acid-balance</a>\n<a class=\"external free\" href=\"https://en.wikipedia.org/wiki/Purine\">https://en.wikipedia.org/wiki/Purine</a>\n<a class=\"external free\" href=\"https://en.wikipedia.org/wiki/Struvite\">https://en.wikipedia.org/wiki/Struvite</a>\n<a rel=\"nofollow\" class=\"external free\" href=\"https://radiopaedia.org/articles/jackstone-calculus\">https://radiopaedia.org/articles/jackstone-calculus</a>\n</p>\n<a rel=\"nofollow\" class=\"external free\" href=\"https://radiopaedia.org/cases/mid-ureteric-calculus\">https://radiopaedia.org/cases/mid-ureteric-calculus</a>",
+        "source": "commons-desc-page"
+       },
+       "DateTimeOriginal": {
+        "value": "2016-12-06",
+        "source": "commons-desc-page"
+       },
+       "Credit": {
+        "value": "open.osmosis.org",
+        "source": "commons-desc-page"
+       },
+       "Artist": {
+        "value": "Osmosis",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "CC BY-SA 4.0",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "UsageTerms": {
+        "value": "Creative Commons Attribution-Share Alike 4.0",
+        "source": "commons-desc-page"
+       },
+       "AttributionRequired": {
+        "value": "true",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "LicenseUrl": {
+        "value": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source": "commons-desc-page"
+       },
+       "Copyrighted": {
+        "value": "True",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "Restrictions": {
+        "value": "",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "License": {
+        "value": "cc-by-sa-4.0",
+        "source": "commons-templates",
+        "hidden": ""
+       }
+      },
+      "mime": "video/webm"
+     }
+    ]
+   },
+   {
+    "pageid": 60478065,
+    "ns": 6,
+    "title": "File:Chronic kidney disease.webm",
+    "index": 4,
+    "imagerepository": "local",
+    "imageinfo": [
+     {
+      "timestamp": "2017-06-28T21:34:33Z",
+      "size": 55976849,
+      "width": 1920,
+      "height": 1080,
+      "duration": 500.834,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/3/3d/Chronic_kidney_disease.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Chronic_kidney_disease.webm",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=60478065",
+      "sha1": "e530aa30bbee6cb8b1457ba4eca304e567b1b7c9",
+      "extmetadata": {
+       "DateTime": {
+        "value": "2017-06-28 21:34:33",
+        "source": "mediawiki-metadata",
+        "hidden": ""
+       },
+       "ObjectName": {
+        "value": "Chronic kidney disease",
+        "source": "mediawiki-metadata"
+       },
+       "CommonsMetadataExtension": {
+        "value": 1.2,
+        "source": "extension",
+        "hidden": ""
+       },
+       "Categories": {
+        "value": "Chronic kidney diseases|Videos from Osmosis",
+        "source": "commons-categories",
+        "hidden": ""
+       },
+       "Assessments": {
+        "value": "",
+        "source": "commons-categories",
+        "hidden": ""
+       },
+       "ImageDescription": {
+        "value": "What is chronic kidney disease (CKD)? Chronic kidney disease is described as any loss of kidney functioning that develops beyond a 3 month period.\n<p>Sources:\n<a rel=\"nofollow\" class=\"external free\" href=\"https://www.kidney.org/atoz/content/about-chronic-kidney-disease\">https://www.kidney.org/atoz/content/about-chronic-kidney-disease</a>\nPathoma by Dr. Sattar (Pg 132-133)\nHarrison’s Principles of Internal Medicine 18th Ed.\nUpToDate\n<a rel=\"nofollow\" class=\"external free\" href=\"http://emedicine.medscape.com/article/238798-overview#a4\">http://emedicine.medscape.com/article/238798-overview#a4</a>\n<a rel=\"nofollow\" class=\"external free\" href=\"http://thelancet.com/journals/lancet/article/PIIS0140-6736(16)32064-5/fulltext\">http://thelancet.com/journals/lancet/article/PIIS0140-6736(16)32064-5/fulltext</a>\n<a rel=\"nofollow\" class=\"external free\" href=\"https://www.kidney.org/sites/default/files/02-10-6785_HBE_Hyperkalemia_Bulletin.pdf\">https://www.kidney.org/sites/default/files/02-10-6785_HBE_Hyperkalemia_Bulletin.pdf</a>\n</p>\n<a rel=\"nofollow\" class=\"external free\" href=\"https://www.kidney.org/sites/default/files/01-10-7278_HBG_CKD_Stages_Flyer3.pdf\">https://www.kidney.org/sites/default/files/01-10-7278_HBG_CKD_Stages_Flyer3.pdf</a>",
+        "source": "commons-desc-page"
+       },
+       "DateTimeOriginal": {
+        "value": "2017-06-21",
+        "source": "commons-desc-page"
+       },
+       "Credit": {
+        "value": "open.osmosis.org, see end of video for license",
+        "source": "commons-desc-page"
+       },
+       "Artist": {
+        "value": "Osmosis",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "CC BY-SA 4.0",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "UsageTerms": {
+        "value": "Creative Commons Attribution-Share Alike 4.0",
+        "source": "commons-desc-page"
+       },
+       "AttributionRequired": {
+        "value": "true",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "LicenseUrl": {
+        "value": "https://creativecommons.org/licenses/by-sa/4.0",
+        "source": "commons-desc-page"
+       },
+       "Copyrighted": {
+        "value": "True",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "Restrictions": {
+        "value": "",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "License": {
+        "value": "cc-by-sa-4.0",
+        "source": "commons-templates",
+        "hidden": ""
+       }
+      },
+      "mime": "video/webm"
+     }
+    ]
+   },
+   {
+    "pageid": 157452351,
+    "ns": 6,
+    "title": "File:Human Kidney Ultrasound Scan.webm",
+    "index": 1,
+    "imagerepository": "local",
+    "imageinfo": [
+     {
+      "timestamp": "2025-01-02T14:42:36Z",
+      "size": 1265298,
+      "width": 1920,
+      "height": 1080,
+      "duration": 6.7330000000000005,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/5/55/Human_Kidney_Ultrasound_Scan.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Human_Kidney_Ultrasound_Scan.webm",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=157452351",
+      "sha1": "73d57e3dc3fd00224e4fee616a7a964ceff660ab",
+      "extmetadata": {
+       "DateTime": {
+        "value": "2025-01-02 14:42:36",
+        "source": "mediawiki-metadata",
+        "hidden": ""
+       },
+       "ObjectName": {
+        "value": "Human Kidney Ultrasound Scan",
+        "source": "mediawiki-metadata"
+       },
+       "CommonsMetadataExtension": {
+        "value": 1.2,
+        "source": "extension",
+        "hidden": ""
+       },
+       "Categories": {
+        "value": "Medical ultrasound|Self-published work|Medical ultrasound examinations|Ultrasound videos|Echocardiographic videos of human kidney|Ultrasound videos of kidney|Videos about the human body",
+        "source": "commons-categories",
+        "hidden": ""
+       },
+       "Assessments": {
+        "value": "",
+        "source": "commons-categories",
+        "hidden": ""
+       },
+       "ImageDescription": {
+        "value": "Human Kidney Ultrasound Scan",
+        "source": "commons-desc-page"
+       },
+       "DateTimeOriginal": {
+        "value": "2025-01-01",
+        "source": "commons-desc-page"
+       },
+       "Credit": {
+        "value": "<span class=\"int-own-work\" lang=\"en\">Own work</span>",
+        "source": "commons-desc-page"
+       },
+       "Artist": {
+        "value": "<a href=\"//commons.wikimedia.org/wiki/User:Ahmed\" title=\"User:Ahmed\">Ahmed</a>",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "CC BY 4.0",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "UsageTerms": {
+        "value": "Creative Commons Attribution 4.0",
+        "source": "commons-desc-page"
+       },
+       "AttributionRequired": {
+        "value": "true",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "LicenseUrl": {
+        "value": "https://creativecommons.org/licenses/by/4.0",
+        "source": "commons-desc-page"
+       },
+       "Copyrighted": {
+        "value": "True",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "Restrictions": {
+        "value": "",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "License": {
+        "value": "cc-by-4.0",
+        "source": "commons-templates",
+        "hidden": ""
+       }
+      },
+      "mime": "video/webm"
+     }
+    ]
+   },
+   {
+    "pageid": 196840120,
+    "ns": 6,
+    "title": "File:Visit to the National Kidney and Transplant Institute (Kidney Center) of Philippines President Bongbong Marcos - 19 June 2025.webm",
+    "index": 2,
+    "imagerepository": "local",
+    "imageinfo": [
+     {
+      "timestamp": "2026-08-05T10:09:55Z",
+      "size": 718427700,
+      "width": 1920,
+      "height": 1080,
+      "duration": 687.02,
+      "url": "https://upload.wikimedia.org/wikipedia/commons/9/9d/Visit_to_the_National_Kidney_and_Transplant_Institute_%28Kidney_Center%29_of_Philippines_President_Bongbong_Marcos_-_19_June_2025.webm?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "descriptionurl": "https://commons.wikimedia.org/wiki/File:Visit_to_the_National_Kidney_and_Transplant_Institute_(Kidney_Center)_of_Philippines_President_Bongbong_Marcos_-_19_June_2025.webm",
+      "descriptionshorturl": "https://commons.wikimedia.org/w/index.php?curid=196840120",
+      "sha1": "6ac15fdf28da1f4873c8a0219debaa9d0d2be11f",
+      "extmetadata": {
+       "DateTime": {
+        "value": "2026-08-05 10:09:55",
+        "source": "mediawiki-metadata",
+        "hidden": ""
+       },
+       "ObjectName": {
+        "value": "Visit to the National Kidney and Transplant Institute (Kidney Center) of Philippines President Bongbong Marcos - 19 June 2025",
+        "source": "mediawiki-metadata"
+       },
+       "CommonsMetadataExtension": {
+        "value": 1.2,
+        "source": "extension",
+        "hidden": ""
+       },
+       "Categories": {
+        "value": "National Kidney and Transplant Institute|PD-PhilippinesGov|Bongbong Marcos in June 2025",
+        "source": "commons-categories",
+        "hidden": ""
+       },
+       "Assessments": {
+        "value": "",
+        "source": "commons-categories",
+        "hidden": ""
+       },
+       "ImageDescription": {
+        "value": "Visit to the National Kidney and Transplant Institute (Kidney Center) of Philippines President Bongbong Marcos - 19 June 2025",
+        "source": "commons-desc-page"
+       },
+       "DateTimeOriginal": {
+        "value": "2025-06-19",
+        "source": "commons-desc-page"
+       },
+       "Credit": {
+        "value": "<a rel=\"nofollow\" class=\"external text\" href=\"https://www.youtube.com/watch?v=JQ1IAD_ynuU\">Radio Television Malacañang</a>",
+        "source": "commons-desc-page"
+       },
+       "Artist": {
+        "value": "Philippine Government - Radio Television Malacañang",
+        "source": "commons-desc-page"
+       },
+       "LicenseShortName": {
+        "value": "Public domain",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "UsageTerms": {
+        "value": "Public domain",
+        "source": "commons-desc-page"
+       },
+       "AttributionRequired": {
+        "value": "false",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "Copyrighted": {
+        "value": "False",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "Restrictions": {
+        "value": "",
+        "source": "commons-desc-page",
+        "hidden": ""
+       },
+       "License": {
+        "value": "pd",
+        "source": "commons-templates",
+        "hidden": ""
+       }
+      },
+      "mime": "video/webm"
+     }
+    ]
+   }
+  ]
+ }
+}

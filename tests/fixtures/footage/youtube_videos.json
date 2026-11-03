@@ -1,0 +1,23 @@
+{
+  "items": [
+    {
+      "id": "abc123",
+      "snippet": {
+        "title": "Forest",
+        "channelTitle": "Jane Doe",
+        "thumbnails": {
+          "high": {
+            "url": "https://i.ytimg.com/forest.jpg"
+          }
+        }
+      },
+      "contentDetails": {
+        "duration": "PT12S",
+        "definition": "hd"
+      },
+      "status": {
+        "license": "creativeCommon"
+      }
+    }
+  ]
+}

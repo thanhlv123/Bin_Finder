@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from bin_finder.provider_config import ProviderConfig
 from bin_finder.providers.base import DiscoveryProvider, ProviderStatus
+from bin_finder.providers.commons import CommonsProvider
+from bin_finder.providers.coverr import CoverrProvider
 from bin_finder.providers.local import LocalLibraryProvider
 from bin_finder.providers.pexels import PexelsProvider
 from bin_finder.providers.pixabay import PixabayProvider
@@ -17,6 +19,8 @@ class ProviderRegistry:
     def from_config(cls, config: ProviderConfig) -> "ProviderRegistry":
         return cls(
             [
+                CommonsProvider(),
+                CoverrProvider(config.coverr_api_key),
                 YouTubeProvider(config.youtube_api_key),
                 StoryblocksProvider(
                     config.storyblocks_public_key,
