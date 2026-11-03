@@ -223,3 +223,14 @@ def test_no_visual_budget_flags_missing_verdicts(monkeypatch):
     )
     assert result.cues[0]["status"] == "needs_review"
     assert "vlm_missing" in result.cues[0]["flags"]
+
+
+def test_youtube_preference_config(tmp_path, monkeypatch) -> None:
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config/matching.local.json").write_text(json.dumps({"youtube_preference": 0.2}))
+    assert MatchConfig.load(tmp_path).youtube_preference == 0.2
+    monkeypatch.setenv("BIN_FINDER_MATCH_YOUTUBE_PREFERENCE", "0.3")
+    assert MatchConfig.load(tmp_path).youtube_preference == 0.3
+    for value in (-0.1, 1.1, float("nan")):
+        with pytest.raises(ValueError):
+            MatchConfig(youtube_preference=value)

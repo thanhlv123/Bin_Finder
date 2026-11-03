@@ -34,6 +34,7 @@ def parser() -> argparse.ArgumentParser:
     arguments.add_argument("--music", type=Path)
     arguments.add_argument("--no-subtitles", action="store_true")
     arguments.add_argument("--no-icon", action="store_true")
+    arguments.add_argument("--youtube-reuse", action=argparse.BooleanOptionalAction, default=None)
     arguments.add_argument("--dry-run", action="store_true")
     return arguments
 
@@ -66,13 +67,18 @@ def produce(arguments: argparse.Namespace, engine: SpeechEngine | None, media_lo
         if arguments.limit_cues <= 0:
             raise ProductionError("--limit-cues must be positive")
         selection.cues = selection.cues[:arguments.limit_cues]
-    resolved = resolve_selections(selection, footage, arguments.allow_suggested)
+    from bin_finder.footage.config import FootageConfig
+    config = ProductionConfig.load(arguments.project_root)
+    reuse = arguments.youtube_reuse
+    if reuse is None:
+        reuse = FootageConfig.load(arguments.project_root).youtube_reuse
+    config = replace(config, youtube_reuse=reuse)
+    resolved = resolve_selections(selection, footage, arguments.allow_suggested, reuse, config.youtube_transform)
     if arguments.dry_run:
         for entry in resolved:
             print(f"{entry['cue']['cue_id']}: {entry['candidate']['source_id']} ({entry['origin']}) — {entry['cue']['text']}")
         print(f"Dry run: {len(resolved)} cues; no speech or media acquired")
         return 0
-    config = ProductionConfig.load(arguments.project_root)
     overrides = {}
     if arguments.music:
         overrides["music_path"] = str(arguments.music.resolve())
@@ -90,7 +96,7 @@ def produce(arguments: argparse.Namespace, engine: SpeechEngine | None, media_lo
     tts_seconds = perf_counter() - started
     narration_path = work_dir / "narration.wav"
     narration_path.write_bytes(narration.wav_bytes)
-    timeline = build_timeline(selection, footage, narration, arguments.allow_suggested)
+    timeline = build_timeline(selection, footage, narration, arguments.allow_suggested, reuse, config.youtube_transform)
     timeline.subtitles = config.subtitles
     timeline.music_path = config.music_path
     timeline.end_hold = config.end_hold
@@ -105,6 +111,9 @@ def produce(arguments: argparse.Namespace, engine: SpeechEngine | None, media_lo
             paths[source_key] = Path(media_loader(entry["candidate"], config)).resolve()
         shot.local_path = str(paths[source_key])
         info = media_probe(paths[source_key], config.ffprobe)
+        if shot.provider == "youtube":
+            from .youtube_transform import transform_shot
+            transform_shot(shot, work_dir / f"youtube_{index:05d}.mp4", config, info.width, info.height)
         duration = shot.end - (shot.start if index else 0) + transitions[index]
         plan_clip(shot, entry["candidate"], info, duration, source_positions.get(source_key, 0))
         source_positions[source_key] = shot.clip_out
@@ -118,6 +127,9 @@ def produce(arguments: argparse.Namespace, engine: SpeechEngine | None, media_lo
     manifest_path = output.parent / "production.json"
     write_credits(timeline, config, credits_path)
     manifest_path.write_text(json.dumps(timeline.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
+    if reuse and footage.youtube_usage_path:
+        from bin_finder.footage.youtube_usage import save_usage
+        save_usage(Path(footage.youtube_usage_path), [shot.youtube for shot in timeline.shots if shot.provider == "youtube"])
     suggested = sum(shot.origin == "suggested" for shot in timeline.shots)
     print(f"Complete: {len(timeline.shots)} cues, {timeline.duration:.2f}s; selected={len(timeline.shots) - suggested}, suggested={suggested}")
     print("Step seconds: " + ", ".join(f"{name}={seconds:.2f}" for name, seconds in timeline.timings.items()))

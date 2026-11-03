@@ -1,0 +1,32 @@
+{
+  "empty": {
+    "message": {
+      "content": ""
+    }
+  },
+  "r3": {
+    "message": {
+      "content": "{\"match\": false, \"score\": 0.1, \"reason\": \"The thumbnail shows a speaker on a stage with large red and white letters 'TEDxUBC'...\", \"needs_motion_check\": false}"
+    }
+  },
+  "regions": {
+    "message": {
+      "content": "{\"score\": 0.85, \"reject\": false, \"regions\": [{\"kind\": \"product_brand\", \"bbox_2d\": [0.4, 0.5, 0.5, 0.6]}]}"
+    }
+  },
+  "missing": {
+    "message": {
+      "content": "{\"score\": \"0.8\"}"
+    }
+  },
+  "boundary": {
+    "message": {
+      "content": "{\"score\": 0.9, \"regions\": [{\"kind\": \"overlay_text\", \"box\": [-0.02, 0.9, 0.18, 1.0]}, {\"kind\": \"unknown\", \"box\": [0, 0, 1, 1]}]}"
+    }
+  },
+  "creatine": {
+    "message": {
+      "content": "{\"score\": 0.9, \"reject\": false, \"regions\": [{\"kind\": \"product_brand\", \"box\": [337, 0, 648, 784]}]}"
+    }
+  }
+}

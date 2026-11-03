@@ -27,6 +27,7 @@ def main(argv=None):
     group.add_argument("--youtube", dest="youtube_enabled", action="store_true")
     group.add_argument("--no-youtube", dest="youtube_enabled", action="store_false")
     parser.set_defaults(youtube_enabled=None)
+    parser.add_argument("--youtube-reuse", action=argparse.BooleanOptionalAction, default=None)
     parser.add_argument("--limit-cues", type=int)
     args = parser.parse_args(argv)
     try:
@@ -36,6 +37,10 @@ def main(argv=None):
             config = replace(config, sources=[s.strip() for s in args.sources.split(",") if s.strip()])
         if args.youtube_enabled is not None:
             config = replace(config, youtube_enabled=args.youtube_enabled)
+        if args.youtube_reuse is not None:
+            config = replace(config, youtube_reuse=args.youtube_reuse)
+        config = replace(config, cache_dir=str(args.project_root / config.cache_dir),
+                         usage_dir=str(args.project_root / config.usage_dir) if config.usage_dir else str(args.output.parent))
         if args.limit_cues is not None:
             if args.limit_cues < 1:
                 raise ValueError("invalid cue limit")

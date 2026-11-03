@@ -285,3 +285,11 @@ def test_production_connection_hint_is_specific(tmp_path, capsys):
     assert "render codec failed" in message
     assert "VoiceStudio" not in message
     assert message in capsys.readouterr().out
+
+
+def test_resume_from_footage_reruns_completed_steps(tmp_path):
+    script, output, options, services = setup_run(tmp_path)
+    assert run_pipeline(script, output, options, services=services) == 0
+    assert run_pipeline(script, output, replace(options, resume=True, from_step="footage"), services=services) == 0
+    steps = read_json(output / "run-state.json")["steps"]
+    assert [step["status"] for step in steps] == ["skipped", "done", "done", "done", "done", "done"]

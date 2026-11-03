@@ -14,6 +14,7 @@ class MatchConfig:
     auto_select_threshold: float = 0.6
     min_text_score: float = 0.15
     min_vlm_score: float = 0.7
+    youtube_preference: float = 0.1
     source_cooldown: int = 2
     no_adjacent_reuse: bool = True
     thumbnail_max_bytes: int = 2_000_000
@@ -32,7 +33,7 @@ class MatchConfig:
                 raise ValueError(name)
         if type(self.vlm_top_n) is not int or self.vlm_top_n < 0:
             raise ValueError('vlm_top_n')
-        for name in ('auto_select_threshold', 'min_text_score', 'min_vlm_score'):
+        for name in ('auto_select_threshold', 'min_text_score', 'min_vlm_score', 'youtube_preference'):
             value = getattr(self, name)
             if not math.isfinite(value) or not 0 <= value <= 1:
                 raise ValueError(name)

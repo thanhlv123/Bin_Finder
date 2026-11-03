@@ -11,7 +11,7 @@ from .steps import read_json, write_json
 
 CONFIG_KEYS = {
     "brief": {"provider": "brief_provider"},
-    "footage": {"sources": "sources", "youtube": "youtube"},
+    "footage": {"sources": "sources", "youtube": "youtube", "youtube_reuse": "youtube_reuse"},
     "matching": {"no_vlm": "no_vlm"},
     "production": {"music": "music", "no_subtitles": "no_subtitles", "no_icon": "no_icon"},
     "qa": {"target_lufs": "target_lufs", "strict": "strict_qa"},
@@ -45,7 +45,7 @@ def load_options(arguments: argparse.Namespace) -> RunOptions:
             if not isinstance(values[key], (str, Path)):
                 raise ValueError(f"Invalid config value: {key}")
             values[key] = Path(values[key]).resolve()
-    for key in ("allow_suggested", "no_vlm", "no_subtitles", "no_icon", "no_export", "strict_qa", "youtube"):
+    for key in ("allow_suggested", "no_vlm", "no_subtitles", "no_icon", "no_export", "strict_qa", "youtube", "youtube_reuse"):
         if key in values and type(values[key]) is not bool:
             raise ValueError(f"Invalid config boolean: {key}")
     if "brief_provider" in values and values["brief_provider"] not in ("auto", "heuristic", "ollama", "openai_compatible"):
@@ -66,6 +66,7 @@ def parser() -> argparse.ArgumentParser:
     command.add_argument("--until-step", choices=STEPS)
     for flag in ("resume", "allow-suggested", "strict-qa", "no-vlm", "no-subtitles", "no-icon", "no-export"):
         command.add_argument("--" + flag, action="store_true", default=None)
+    command.add_argument("--youtube-reuse", action=argparse.BooleanOptionalAction, default=None)
     command.add_argument("--no-youtube", dest="youtube", action="store_false", default=None)
     command.add_argument("--limit-cues", type=int)
     command.add_argument("--target-lufs", type=float)

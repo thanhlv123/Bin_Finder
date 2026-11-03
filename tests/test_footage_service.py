@@ -90,3 +90,38 @@ def test_coverr_provider_config(tmp_path, monkeypatch):
     registry = ProviderRegistry.from_config(config)
     assert registry.get("commons").status().configured
     assert registry.get("coverr").status().configured
+
+
+def test_youtube_reserved_quota(tmp_path):
+    from types import SimpleNamespace
+
+    class StockProvider(FakeProvider):
+        def search(self, request):
+            original = super().search(request).candidates[0]
+            candidates = [replace(original, source_id=f"pexels:{index}") for index in range(35)]
+            return ProviderSearchResult(self.key, candidates)
+
+    youtube_service = SimpleNamespace(usage_path="", search=lambda *args: ([{"provider": "youtube"}] * 2, []))
+    plan = make_plan()
+    plan = replace(plan, cues=plan.cues[:1], briefs=plan.briefs[:1])
+    registry = ProviderRegistry([StockProvider("pexels"), FakeProvider("youtube")])
+    for reuse, expected in ((True, 32), (False, 30)):
+        config = FootageConfig(sources=["pexels"], youtube_enabled=True, youtube_reuse=reuse)
+        result = search_footage(plan, registry, config, youtube_service if reuse else None)
+        path = tmp_path / "footage.json"
+        path.write_text(json.dumps(result.to_dict()))
+        payload = json.loads(path.read_text())
+        assert len(payload["cues"][0]["candidates"]) == expected
+        assert payload["candidates_per_source"].get("youtube", 0) == (2 if reuse else 0)
+
+
+def test_youtube_quota_config(tmp_path, monkeypatch) -> None:
+    import pytest
+
+    (tmp_path / "config").mkdir()
+    (tmp_path / "config/footage.local.json").write_text(json.dumps({"youtube_max_candidates_per_cue": 5}))
+    assert FootageConfig.load(tmp_path).youtube_max_candidates_per_cue == 5
+    monkeypatch.setenv("BIN_FINDER_FOOTAGE_YOUTUBE_MAX_CANDIDATES_PER_CUE", "2")
+    assert FootageConfig.load(tmp_path).youtube_max_candidates_per_cue == 2
+    with pytest.raises(ValueError):
+        FootageConfig(youtube_max_candidates_per_cue=0)

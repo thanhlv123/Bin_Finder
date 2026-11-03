@@ -7,6 +7,7 @@ from bin_finder.matching.models import SelectionPlan
 
 from . import MissingSelectionError, ProductionError
 from .narration import Narration
+from .youtube_transform import YouTubeTransformConfig
 
 
 def clean_url(value: str) -> str:
@@ -21,7 +22,7 @@ def clean_url(value: str) -> str:
 
 
 def resolve_selections(selection_plan: SelectionPlan, footage_plan: FootagePlan,
-                       allow_suggested: bool = False) -> list[dict]:
+                       allow_suggested: bool = False, youtube_reuse: bool = False, youtube_transform: YouTubeTransformConfig | None = None) -> list[dict]:
     """Fail all missing or forbidden choices before any side effects."""
     footage_cues = {cue["cue_id"]: cue for cue in footage_plan.cues}
     resolved = []
@@ -34,13 +35,18 @@ def resolve_selections(selection_plan: SelectionPlan, footage_plan: FootagePlan,
             origin = "suggested"
         candidates = footage_cues.get(cue["cue_id"], {}).get("candidates", [])
         candidate = next((item for item in candidates if item["source_id"] == source_id), None)
-        eligible = candidate and candidate.get("provider", "").lower() != "youtube"
+        youtube_allowed = candidate and youtube_reuse and candidate.get("license", {}).get("kind") == "youtube_reuse"
+        eligible = candidate and (candidate.get("provider", "").lower() != "youtube" or youtube_allowed)
         eligible = eligible and not candidate.get("reference_only")
         eligible = eligible and candidate.get("license", {}).get("usable_in_video") is True
         if not eligible:
             missing.append(f"{cue['cue_id']}: {cue['text']}")
         else:
             resolved.append(dict(cue=cue, candidate=candidate, origin=origin))
+    if youtube_reuse:
+        from .youtube_selection import prepare_youtube_selections
+        missing.extend(prepare_youtube_selections(resolved, footage_cues, footage_plan.youtube_usage_path,
+                                                  youtube_transform))
     if missing:
         raise MissingSelectionError("Missing eligible footage selections:\n" + "\n".join(missing))
     if not resolved:
@@ -65,6 +71,12 @@ class Shot:
     effects: dict = field(default_factory=dict)
     notes: list[str] = field(default_factory=list)
     block_index: int = 0
+    youtube: dict = field(default_factory=dict)
+    transforms: list[str] = field(default_factory=list)
+    zoom: float = 1.0
+    rotate: float = 0.0
+    mirrored: bool = False
+    blurred_regions: list[dict] = field(default_factory=list)
 
 
 @dataclass
@@ -79,6 +91,7 @@ class Timeline:
     subtitles: bool = True
     music_path: str | None = None
     end_hold: float = 0.0
+    youtube_reuse: bool = False
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -91,9 +104,10 @@ class Timeline:
 
 
 def build_timeline(selection_plan: SelectionPlan, footage_plan: FootagePlan, narration: Narration,
-                   allow_suggested: bool = False) -> Timeline:
+                   allow_suggested: bool = False, youtube_reuse: bool = False,
+                   youtube_transform: YouTubeTransformConfig | None = None) -> Timeline:
     """Start shots on first words and hold the last shot beyond the WAV tail."""
-    resolved = resolve_selections(selection_plan, footage_plan, allow_suggested)
+    resolved = resolve_selections(selection_plan, footage_plan, allow_suggested, youtube_reuse, youtube_transform)
     duration = narration.duration + narration.end_hold
     shots = []
     for index, entry in enumerate(resolved):
@@ -105,12 +119,16 @@ def build_timeline(selection_plan: SelectionPlan, footage_plan: FootagePlan, nar
             raise ProductionError(f"Nonpositive cue duration: {cue['cue_id']}")
         license_info = {name: candidate["license"][name] for name in
                         ("provider", "source_id", "title", "creator", "creator_url", "source_url",
-                         "license_name", "license_url", "attribution_required", "usable_in_video")
+                         "license_name", "license_url", "attribution_required", "usable_in_video", "kind", "requires_transform")
                         if name in candidate["license"]}
         for name in ("source_url", "creator_url", "license_url"):
             if name in license_info:
                 license_info[name] = clean_url(license_info[name])
+        if candidate["provider"] == "youtube":
+            license_info["source_url"] = candidate["youtube"]["url"]
         shots.append(Shot(cue["cue_id"], cue["text"], start, end, candidate["source_id"],
                           candidate["provider"], "", entry["origin"], license_info,
-                          block_index=narration.cue_block_indices.get(cue["cue_id"], 0)))
-    return Timeline(shots, duration, [asdict(word) for word in narration.words])
+                          block_index=narration.cue_block_indices.get(cue["cue_id"], 0),
+                          youtube=dict(candidate.get("youtube") or {}),
+                          notes=list(cue.get("youtube_rejections") or [])))
+    return Timeline(shots, duration, [asdict(word) for word in narration.words], youtube_reuse=youtube_reuse)

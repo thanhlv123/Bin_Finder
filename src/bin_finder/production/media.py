@@ -86,8 +86,14 @@ def rendition_url(candidate: dict) -> str:
 
 def acquire_media(candidate: dict, config: ProductionConfig) -> Path:
     """Use verified F012 cache or stream HTTPS without redirects or proxies."""
-    if candidate.get("reference_only") or candidate.get("provider", "").lower() == "youtube" or candidate.get("license", {}).get("usable_in_video") is not True:
+    youtube_allowed = (config.youtube_reuse and candidate.get("license", {}).get("kind") == "youtube_reuse")
+    if candidate.get("reference_only") or (candidate.get("provider", "").lower() == "youtube" and not youtube_allowed) or candidate.get("license", {}).get("usable_in_video") is not True:
         raise ProductionError("Media is not eligible for video")
+    if candidate.get("provider") == "youtube" and youtube_allowed:
+        path = Path(candidate.get("local_path") or "")
+        if not path.is_file():
+            raise ProductionError("YouTube local clip is missing")
+        return path
     record_fields = {setting.name for setting in fields(CandidateRecord)}
     record = CandidateRecord(**{name: value for name, value in candidate.items() if name in record_fields})
     verified = verified_candidate_path(record)
