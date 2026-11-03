@@ -91,6 +91,9 @@ def produce(arguments: argparse.Namespace, engine: SpeechEngine | None, media_lo
     narration_path = work_dir / "narration.wav"
     narration_path.write_bytes(narration.wav_bytes)
     timeline = build_timeline(selection, footage, narration, arguments.allow_suggested)
+    timeline.subtitles = config.subtitles
+    timeline.music_path = config.music_path
+    timeline.end_hold = config.end_hold
     transitions = transition_durations(timeline, config)
     started = perf_counter()
     paths = {}

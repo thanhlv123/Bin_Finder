@@ -16,8 +16,8 @@ Chạy được headless bằng một lệnh `bin_finder run`. **1.0 đạt khi 
 | R1 — Visual brief theo câu (đang làm, PR chờ) | AI chuyển từng câu/cụm lời thành visual brief và chuỗi shot bám ngữ cảnh. | Duyệt được brief kịch bản thật, truy vết về lời gốc, chỉ rõ phần không có hình phù hợp. |
 | R2 — Nguồn footage (đang làm, PR chờ) | Thêm Coverr, Commons, công tắc YouTube, giấy phép; giữ discovery tách acquisition. | Tìm được ứng viên từ nguồn cấu hình; tắt YouTube thì không gọi nguồn; chỉ media được phép mới đủ điều kiện dựng. |
 | R3 — Chấm khớp + AI tự chọn + màn hình duyệt (xong (#44)) | Embedding lọc nhanh, VLM xác nhận top 3; chọn tay hoặc AI tự chọn, thay/khóa lựa chọn. | Đánh giá footage thật có nhãn người duyệt; giữ source rotation, anti-adjacent reuse, anti-overlap và báo ca không chắc. |
-| R4 — Sản xuất video (đang làm, PR chờ) | TTS, dựng theo mốc thời gian giọng, hiệu ứng, nhạc, phụ đề. | Video xem được với hình, tiếng, phụ đề đồng bộ theo voice thật. |
-| R5 — Tự kiểm tra + xuất | Kiểm tra chất lượng trước khi xuất MP4 + credits. | Phát hiện thiếu media, lỗi timing/âm thanh/phụ đề và quyền chưa rõ; MP4 phát được, credits truy vết nguồn. |
+| R4 — Sản xuất video (xong (#45)) | TTS, dựng theo mốc thời gian giọng, hiệu ứng, nhạc, phụ đề. | Video xem được với hình, tiếng, phụ đề đồng bộ theo voice thật. |
+| R5 — Tự kiểm tra + xuất (đang làm, PR chờ) | Kiểm tra chất lượng trước khi xuất MP4 + credits. | Phát hiện thiếu media, lỗi timing/âm thanh/phụ đề và quyền chưa rõ; MP4 phát được, credits truy vết nguồn. |
 | R6 — Headless `bin_finder run` | Nối toàn bộ pipeline qua một lệnh với cấu hình rõ ràng. | Một lệnh đi từ kịch bản đến MP4 + credits không cần GUI, báo lỗi và trạng thái đủ để kiểm tra. |
 | R7 — Nghiệm thu 1.0 | Làm trọn một video thật để chủ dự án đánh giá. | Chủ dự án xem video cuối và chấm đạt 1.0. |
 

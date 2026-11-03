@@ -253,3 +253,29 @@ VLM bật mặc định, dùng cấu hình F021: `BIN_FINDER_OLLAMA_URL`, `BIN_F
 Tầng 1 hiện là lexical: 0.35 BM25 + 0.25 must-show phrase + 0.35 action + chất lượng tối đa 0.05 − 0.15 mỗi token avoid; giới hạn 0.39 nếu thiếu động từ hành động. Điểm cuối có VLM là 0.4 text + 0.6 VLM, thiếu VLM dùng text và cờ `vlm_missing`.
 Thumbnail không chứng minh chuyển động; kết quả uncertain cần duyệt. YouTube chỉ tham khảo. Selection không cấp quyền tải/dựng; nếu phải dùng lại nguồn thì đánh dấu overlap chưa kiểm chứng. Khóa được áp lại từ decisions khi ID vẫn nằm trong Top K; ID ngoài Top K được cảnh báo, không tự thay thế.
 R1 có `retry_single` mặc định bật: mỗi cue LLM lỗi được thử riêng một lần; lỗi kết nối dừng gọi tiếp.
+
+
+## QA + export (R5)
+
+Luồng offline: `production → qa → (export)`. QA đọc MP4, `production.json`
+và `credits.txt` cạnh video; không gọi mạng hay VoiceStudio.
+
+```powershell
+python -m bin_finder.qa output/video.mp4 --strict
+python -m bin_finder.qa output/video.mp4 --strict --check-sources --export output/final.mp4 --target-lufs -14
+python -m bin_finder.qa output/video.mp4 --production output/production.json --credits output/credits.txt -o output/qa --project-root .
+```
+
+`qa-report.json` và `qa-report.html` tiếng Việt được ghi cạnh video (hoặc `-o`).
+`blocker` là lỗi chặn; `warning` cần xem lại; `info` cung cấp ngữ cảnh. ĐẠT nghĩa
+là không có blocker, không thay thế việc người dùng xem video và duyệt nội dung.
+Exit code: 0 khi đạt hoặc không bật `--strict`; 3 khi strict có blocker;
+2 khi đầu vào/cấu hình hỏng hoặc xuất thất bại. Thiếu credits là blocker trong
+báo cáo. Cache nguồn bị xóa chỉ cảnh báo, trừ khi bật `--check-sources`.
+
+Xuất dùng loudnorm hai lượt, giữ nguyên stream hình, âm thanh AAC 192k và
+faststart. File đích phải mới. Strict chỉ xuất khi không có blocker; chế độ
+không strict vẫn xuất kèm cảnh báo rõ. File xuất được QA lại và ghi
+`qa-report.final.json/html`; thời lượng phải giữ trong ±0.1 giây.
+QA dùng công cụ và định dạng từ `ProductionConfig`; file timeline cũ mặc định
+có phụ đề. Chưa thêm cờ `--qa` vào production; chạy lệnh QA riêng sau dựng.
