@@ -1,0 +1,9 @@
+{
+  "version": 1,
+  "decisions": {
+    "cue-1": {
+      "source_id": "pexels:1",
+      "lock": true
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "version": "selection_plan_v1",
+  "footage_sha256": "",
+  "brief_sha256": "",
+  "script_sha256": "",
+  "config": {},
+  "cues": [
+    {
+      "cue_id": "cue-1",
+      "text": "Red sunrise.",
+      "ranked": [
+        {
+          "source_id": "pexels:1",
+          "final_score": 0.9
+        }
+      ],
+      "selected_source_id": "pexels:1",
+      "suggested_source_id": "pexels:1",
+      "status": "auto_selected",
+      "flags": []
+    },
+    {
+      "cue_id": "cue-2",
+      "text": "Green trees.",
+      "ranked": [
+        {
+          "source_id": "pexels:2",
+          "final_score": 0.9
+        }
+      ],
+      "selected_source_id": "pexels:2",
+      "suggested_source_id": "pexels:2",
+      "status": "auto_selected",
+      "flags": []
+    },
+    {
+      "cue_id": "cue-3",
+      "text": "Blue water.",
+      "ranked": [
+        {
+          "source_id": "pexels:3",
+          "final_score": 0.9
+        }
+      ],
+      "selected_source_id": "pexels:3",
+      "suggested_source_id": "pexels:3",
+      "status": "auto_selected",
+      "flags": []
+    }
+  ],
+  "stats": {}
+}

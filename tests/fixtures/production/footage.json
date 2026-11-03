@@ -1,0 +1,106 @@
+{
+  "version": "footage_plan_v1",
+  "brief_sha256": "",
+  "script_sha256": "",
+  "sources_used": [
+    "pexels"
+  ],
+  "cues": [
+    {
+      "cue_id": "cue-1",
+      "text": "Red sunrise.",
+      "candidates": [
+        {
+          "candidate_id": "cue-1:pexels:1",
+          "scene_id": "cue-1",
+          "provider": "pexels",
+          "source_id": "pexels:1",
+          "title": "Color 1",
+          "duration": 6,
+          "score": 1,
+          "preview_url": "https://videos.pexels.com/video-1.mp4",
+          "source_metadata": {},
+          "reference_only": false,
+          "license": {
+            "provider": "pexels",
+            "source_id": "pexels:1",
+            "title": "Color 1",
+            "creator": "Test creator",
+            "creator_url": "",
+            "source_url": "https://www.pexels.com/video/1/",
+            "license_name": "Pexels License",
+            "license_url": "https://www.pexels.com/license/",
+            "attribution_required": false,
+            "usable_in_video": true
+          }
+        }
+      ],
+      "errors": []
+    },
+    {
+      "cue_id": "cue-2",
+      "text": "Green trees.",
+      "candidates": [
+        {
+          "candidate_id": "cue-2:pexels:2",
+          "scene_id": "cue-2",
+          "provider": "pexels",
+          "source_id": "pexels:2",
+          "title": "Color 2",
+          "duration": 6,
+          "score": 1,
+          "preview_url": "https://videos.pexels.com/video-2.mp4",
+          "source_metadata": {},
+          "reference_only": false,
+          "license": {
+            "provider": "pexels",
+            "source_id": "pexels:2",
+            "title": "Color 2",
+            "creator": "Test creator",
+            "creator_url": "",
+            "source_url": "https://www.pexels.com/video/2/",
+            "license_name": "Pexels License",
+            "license_url": "https://www.pexels.com/license/",
+            "attribution_required": false,
+            "usable_in_video": true
+          }
+        }
+      ],
+      "errors": []
+    },
+    {
+      "cue_id": "cue-3",
+      "text": "Blue water.",
+      "candidates": [
+        {
+          "candidate_id": "cue-3:pexels:3",
+          "scene_id": "cue-3",
+          "provider": "pexels",
+          "source_id": "pexels:3",
+          "title": "Color 3",
+          "duration": 6,
+          "score": 1,
+          "preview_url": "https://videos.pexels.com/video-3.mp4",
+          "source_metadata": {},
+          "reference_only": false,
+          "license": {
+            "provider": "pexels",
+            "source_id": "pexels:3",
+            "title": "Color 3",
+            "creator": "Test creator",
+            "creator_url": "",
+            "source_url": "https://www.pexels.com/video/3/",
+            "license_name": "Pexels License",
+            "license_url": "https://www.pexels.com/license/",
+            "attribution_required": false,
+            "usable_in_video": true
+          }
+        }
+      ],
+      "errors": []
+    }
+  ],
+  "candidates_per_source": {
+    "pexels": 3
+  }
+}
